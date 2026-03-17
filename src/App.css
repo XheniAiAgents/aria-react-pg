@@ -700,17 +700,3 @@ input, textarea, select { font-size: 16px !important; }
   border-radius: 6px; border: 1px solid var(--trace);
   margin-bottom: 6px; display: inline-block;
 }
-
-/* ══ LIGHT MODE USER BUBBLE ══ */
-
-.app-root.light .u-bubble {
-  background: var(--a3);
-  border: 1px solid var(--a-line);
-  color: #0a0a0a;
-}
-
-@media (max-height: 500px) {
-  .mobile-nav {
-    display: none;
-  }
-}
