@@ -701,9 +701,7 @@ input, textarea, select { font-size: 16px !important; }
   margin-bottom: 6px; display: inline-block;
 }
 
-/* Keyboard handling */
-:root { --keyboard-offset: 0px; }
-
+/* Mobile nav keyboard handling */
 .mobile-nav {
   transition: transform 0.2s ease;
 }
@@ -712,12 +710,12 @@ input, textarea, select { font-size: 16px !important; }
   pointer-events: none;
 }
 
+/* iOS Safari keyboard fix — use dvh so layout adjusts naturally */
 @media (max-width: 640px) {
-  .input-zone {
-    transform: translateY(calc(-1 * var(--keyboard-offset)));
-    transition: transform 0.05s linear;
+  #chatView {
+    height: 100dvh;
   }
-  .msgs {
-    padding-bottom: calc(16px + var(--keyboard-offset));
+  .input-zone {
+    background: var(--deep);
   }
 }

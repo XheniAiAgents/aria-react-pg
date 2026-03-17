@@ -34,24 +34,15 @@ export default function AppShell({
   const mobileNotifRef = useRef(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
-  // Hide MobileNav and reposition input when keyboard is open
+  // Hide MobileNav when keyboard is open
   useEffect(() => {
     if (!window.visualViewport) return;
     const handler = () => {
-      const vv = window.visualViewport;
-      const ratio = vv.height / window.screen.height;
-      const isOpen = ratio < 0.75;
-      setKeyboardOpen(isOpen);
-      // Push the chat input up above the keyboard
-      const offset = isOpen ? window.innerHeight - vv.height - vv.offsetTop : 0;
-      document.documentElement.style.setProperty("--keyboard-offset", offset + "px");
+      const ratio = window.visualViewport.height / window.screen.height;
+      setKeyboardOpen(ratio < 0.75);
     };
     window.visualViewport.addEventListener("resize", handler);
-    window.visualViewport.addEventListener("scroll", handler);
-    return () => {
-      window.visualViewport.removeEventListener("resize", handler);
-      window.visualViewport.removeEventListener("scroll", handler);
-    };
+    return () => window.visualViewport.removeEventListener("resize", handler);
   }, []);
 
   const gmail = useGmail(API, userId, showToast);
