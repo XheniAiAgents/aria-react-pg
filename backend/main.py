@@ -344,6 +344,9 @@ async def chat_endpoint(req: ChatRequest, request: Request):
         response = await chat(req.user_id, req.message, req.mode, req.lang)
         return {"response": response, "mode": req.mode}
     except Exception as e:
+        import traceback
+        print(f"[chat] ERROR for user {req.user_id}: {e}")
+        print(traceback.format_exc())
         raise HTTPException(500, str(e))
 
 

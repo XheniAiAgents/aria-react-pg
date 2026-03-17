@@ -14,7 +14,11 @@ from backend.database import (
     add_event, get_events, delete_event
 )
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+def get_groq_client():
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable is not set")
+    return Groq(api_key=api_key)
 
 WORK_PROMPT = """You are ARIA in WORK MODE - sharp, focused, professional. A trusted colleague.
 
@@ -133,7 +137,7 @@ async def build_system_prompt(user_id: int, mode: str = "work", lang: str = "en"
     memories = await get_memories(user_id)
     tasks = await get_tasks(user_id)
     events = await get_events(user_id)
-    from database import get_google_token
+    from backend.database import get_google_token
     gmail_token = await get_google_token(user_id)
     gmail_connected = gmail_token is not None
     gmail_address = gmail_token["gmail_address"] if gmail_token else None
@@ -233,9 +237,9 @@ async def extract_and_execute_commands(text: str, user_id: int) -> str:
                     await delete_event(int(event_id), user_id)
             elif action == "fetch_emails":
                 try:
-                    from database import get_google_token
-                    from google_oauth import fetch_todays_emails_oauth
-                    from email_digest import summarize_emails
+                    from backend.database import get_google_token
+                    from backend.google_oauth import fetch_todays_emails_oauth
+                    from backend.email_digest import summarize_emails
                     import json as _json
                     token = await get_google_token(user_id)
                     if token:
@@ -274,6 +278,7 @@ async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = 
     system = await build_system_prompt(user_id, mode, lang)
     messages = [{"role": "system", "content": system}] + history
 
+    client = get_groq_client()
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         max_tokens=1024,
@@ -300,7 +305,7 @@ async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = 
                     )
                 }
             ]
-            followup = client.chat.completions.create(
+            followup = get_groq_client().chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 max_tokens=1024,
                 messages=followup_messages,
