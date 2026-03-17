@@ -701,12 +701,23 @@ input, textarea, select { font-size: 16px !important; }
   margin-bottom: 6px; display: inline-block;
 }
 
-/* Hide MobileNav when keyboard is open */
+/* Keyboard handling */
+:root { --keyboard-offset: 0px; }
+
+.mobile-nav {
+  transition: transform 0.2s ease;
+}
 .mobile-nav--hidden {
   transform: translateY(100%);
   pointer-events: none;
-  transition: transform 0.2s ease;
 }
-.mobile-nav {
-  transition: transform 0.2s ease;
+
+@media (max-width: 640px) {
+  .input-zone {
+    transform: translateY(calc(-1 * var(--keyboard-offset)));
+    transition: transform 0.05s linear;
+  }
+  .msgs {
+    padding-bottom: calc(16px + var(--keyboard-offset));
+  }
 }
