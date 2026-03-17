@@ -701,16 +701,8 @@ input, textarea, select { font-size: 16px !important; }
   margin-bottom: 6px; display: inline-block;
 }
 
-/* ══ LIGHT MODE USER BUBBLE ══ */
-.app-root.light .u-bubble {
-  background: var(--a3);
-  border: 1px solid var(--a-line);
-  color: #0a0a0a;
-}
-
-/* iOS keyboard fix */
-@supports (-webkit-touch-callout: none) {
-  .app-root {
-    height: -webkit-fill-available;
+@media (max-height: 500px) {
+  .mobile-nav {
+    display: none;
   }
 }
