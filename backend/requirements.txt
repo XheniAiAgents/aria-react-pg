@@ -1,0 +1,15 @@
+fastapi==0.111.0
+uvicorn==0.29.0
+groq==0.11.0
+python-dotenv==1.0.1
+aiosqlite==0.20.0
+python-telegram-bot==21.2
+pydantic==2.7.1
+resend
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+requests
+aiohttp
+slowapi
+httpx==0.27.0
