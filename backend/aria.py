@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from database import (
+from backend.database import (
     save_message, get_conversation_history,
     save_memory, get_memories,
     add_task, get_tasks, delete_task, complete_task,

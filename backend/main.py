@@ -19,11 +19,11 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from datetime import datetime
 from fastapi import File, UploadFile, Form
-from file_handler import extract_text_from_file
+from backend.file_handler import extract_text_from_file
 
 load_dotenv()
 
-from database import (
+from backend.database import (
     init_db,
     ensure_link_codes_table, ensure_reset_tokens_table,
     ensure_email_account_table, ensure_google_tokens_table,
@@ -44,10 +44,10 @@ from database import (
     get_email_account, delete_email_account,
     verify_password, hash_password,
 )
-from aria import chat
-from email_service import send_welcome_email, send_reset_email, send_digest_email
-from email_digest import summarize_emails
-from google_oauth import get_auth_url, exchange_code, get_gmail_address, fetch_todays_emails_oauth
+from backend.aria import chat
+from backend.email_service import send_welcome_email, send_reset_email, send_digest_email
+from backend.email_digest import summarize_emails
+from backend.google_oauth import get_auth_url, exchange_code, get_gmail_address, fetch_todays_emails_oauth
 
 
 # ── Rate limiter ──────────────────────────────────────────────────────────────
@@ -149,12 +149,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files
-frontend_path = Path(__file__).parent.parent / "frontend"
-icons_path = Path(__file__).parent.parent / "icons"
+# Static files — Vite dist is copied to backend/frontend/ during build
+frontend_path = Path(__file__).parent / "frontend"
+icons_path = frontend_path / "icons"
+assets_path = frontend_path / "assets"
 
-if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+if assets_path.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
 if icons_path.exists():
     app.mount("/icons", StaticFiles(directory=str(icons_path)), name="icons")
 
