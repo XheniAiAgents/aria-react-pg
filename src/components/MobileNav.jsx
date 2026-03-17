@@ -1,4 +1,4 @@
-export default function MobileNav({ activeTab, onTabChange, notifCount, onNotifOpen, t }) {
+export default function MobileNav({ activeTab, onTabChange, notifCount, onNotifOpen, hidden, t }) {
   const tabs = [
     { id: 'chat', key: 'chat', icon: <><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></> },
     { id: 'tasks', key: 'tasks', icon: <><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></> },
@@ -7,7 +7,7 @@ export default function MobileNav({ activeTab, onTabChange, notifCount, onNotifO
   ];
 
   return (
-    <nav className="mobile-nav">
+    <nav className={"mobile-nav" + (hidden ? " mobile-nav--hidden" : "")}>
       <div className="mn-items">
         {tabs.map(tab => (
           <div key={tab.id} id={`mn-${tab.id}`} className={`mn-item${activeTab === tab.id ? ' on' : ''}`} onClick={() => onTabChange(tab.id)}>

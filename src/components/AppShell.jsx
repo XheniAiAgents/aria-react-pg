@@ -32,6 +32,18 @@ export default function AppShell({
 
   const desktopNotifRef = useRef(null);
   const mobileNotifRef = useRef(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  // Hide MobileNav when keyboard is open
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const handler = () => {
+      const ratio = window.visualViewport.height / window.screen.height;
+      setKeyboardOpen(ratio < 0.75);
+    };
+    window.visualViewport.addEventListener("resize", handler);
+    return () => window.visualViewport.removeEventListener("resize", handler);
+  }, []);
 
   const gmail = useGmail(API, userId, showToast);
 
@@ -186,6 +198,7 @@ export default function AppShell({
         activeTab={activeTab} onTabChange={handleTabChange}
         notifCount={notifCount}
         onNotifOpen={() => { setMobileNotifOpen(true); setNotifCount(0); }}
+        hidden={keyboardOpen}
         t={t}
       />
 
