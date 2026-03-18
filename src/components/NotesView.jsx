@@ -186,8 +186,8 @@ export default function NotesView({ API, userId, visible, showToast }) {
       e.preventDefault();
       const span = row.querySelector('.note-cb-text');
       // Check both span text and full row text (iOS puts text directly in row sometimes)
-      const rowText = (span?.textContent || '') + (row.textContent || '');
-      if (!rowText.replace(/[\s\u200B]/g, '').length) {
+      const visibleText = (row.textContent || '').replace(/[\u200B\u00A0\s]/g, '');
+      if (!visibleText.length) {
         const newDiv = document.createElement('div');
         newDiv.innerHTML = '<br>';
         row.insertAdjacentElement('afterend', newDiv);
@@ -202,16 +202,17 @@ export default function NotesView({ API, userId, visible, showToast }) {
         cb.type = 'checkbox'; cb.className = 'note-cb-input';
         const sp = document.createElement('span');
         sp.className = 'note-cb-text';
-        const tn = document.createTextNode('');
-        sp.appendChild(tn);
+        sp.setAttribute('contenteditable', 'true');
         newRow.appendChild(cb);
-        newRow.appendChild(document.createTextNode(' '));
+        newRow.appendChild(document.createTextNode(' '));
         newRow.appendChild(sp);
         row.insertAdjacentElement('afterend', newRow);
+        sp.focus();
         const range = document.createRange();
-        range.setStart(tn, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-        editorRef.current?.focus();
+        range.selectNodeContents(sp);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
       contentRef.current = editorRef.current?.innerHTML || '';
       scheduleAutoSave(editTitle, editTag, editColor);
@@ -376,16 +377,17 @@ export default function NotesView({ API, userId, visible, showToast }) {
         cb.type = 'checkbox'; cb.className = 'note-cb-input';
         const sp = document.createElement('span');
         sp.className = 'note-cb-text';
-        const tn = document.createTextNode('');
-        sp.appendChild(tn);
+        sp.setAttribute('contenteditable', 'true');
         newRow.appendChild(cb);
-        newRow.appendChild(document.createTextNode(' '));
+        newRow.appendChild(document.createTextNode(' '));
         newRow.appendChild(sp);
         row.insertAdjacentElement('afterend', newRow);
+        sp.focus();
         const range = document.createRange();
-        range.setStart(tn, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-        editorRef.current?.focus();
+        range.selectNodeContents(sp);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
       }
       contentRef.current = editorRef.current?.innerHTML || '';
       scheduleAutoSave(editTitle, editTag, editColor);
