@@ -3,7 +3,7 @@ import Rail from './Rail';
 import LeftPanel from './LeftPanel';
 import RightPanel from './RightPanel';
 import ChatView from './ChatView';
-import TasksView from './TasksView';
+import OrganiseView from './OrganiseView';
 import CalendarView from './CalendarView';
 import EmailView from './EmailView';
 import SettingsPanel from './SettingsPanel';
@@ -132,7 +132,7 @@ export default function AppShell({
     lang, onSetLang: setLang, t,
   };
 
-  const tabLabels = { chat: t('chat'), tasks: t('tasks'), cal: t('calendar'), email: t('email') };
+  const tabLabels = { chat: t('chat'), tasks: t('organise'), cal: t('calendar'), email: t('email') };
 
   return (
     <>
@@ -179,7 +179,7 @@ export default function AppShell({
 
           <ChatView API={API} userId={userId} mode={mode} lang={lang}
             visible={activeTab === 'chat'} onMsgCount={handleMsgCount} t={t} />
-          <TasksView API={API} userId={userId}
+          <OrganiseView API={API} userId={userId}
             visible={activeTab === 'tasks'} showToast={showToast} t={t} />
           <CalendarView API={API} userId={userId}
             visible={activeTab === 'cal'} showToast={showToast}

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 
 const TRANSLATIONS = {
   en: {
-    chat: 'Chat', tasks: 'Tasks', calendar: 'Calendar', email: 'Email', alerts: 'Alerts',
+    chat: 'Chat', tasks: 'Tasks', organise: 'Organise', calendar: 'Calendar', email: 'Email', alerts: 'Alerts',
     addTask: 'Add task', addEvent: 'Add event', pending: 'Pending',
     noTasks: 'No pending tasks. Ask ARIA or add one above.',
     upcomingTasks: 'Upcoming tasks', todayEvents: "Today's events", today: 'Today',
@@ -22,7 +22,7 @@ const TRANSLATIONS = {
     connectTelegram: 'Connect Telegram',
   },
   es: {
-    chat: 'Chat', tasks: 'Tareas', calendar: 'Calendario', email: 'Correo', alerts: 'Alertas',
+    chat: 'Chat', tasks: 'Tareas', organise: 'Organizar', calendar: 'Calendario', email: 'Correo', alerts: 'Alertas',
     addTask: 'Añadir tarea', addEvent: 'Añadir evento', pending: 'Pendiente',
     noTasks: 'Sin tareas pendientes. Pregunta a ARIA o añade una arriba.',
     upcomingTasks: 'Próximas tareas', todayEvents: 'Eventos de hoy', today: 'Hoy',
@@ -42,7 +42,7 @@ const TRANSLATIONS = {
     connectTelegram: 'Conectar Telegram',
   },
   sq: {
-    chat: 'Bisedë', tasks: 'Detyra', calendar: 'Kalendar', email: 'Email', alerts: 'Sinjalizime',
+    chat: 'Bisedë', tasks: 'Detyra', organise: 'Organizo', calendar: 'Kalendar', email: 'Email', alerts: 'Sinjalizime',
     addTask: 'Shto detyrë', addEvent: 'Shto ngjarje', pending: 'Në pritje',
     noTasks: 'Nuk ka detyra. Pyet ARIA-n ose shto një sipër.',
     upcomingTasks: 'Detyrat e ardhshme', todayEvents: 'Ngjarjet e sotme', today: 'Sot',

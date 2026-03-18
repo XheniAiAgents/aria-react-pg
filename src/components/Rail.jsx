@@ -20,10 +20,11 @@ export default function Rail({ activeTab, onTabChange, userName, onSettingsToggl
         </svg>
       </button>
 
-      <button id="ri-tasks" className={`ri${activeTab === 'tasks' ? ' on' : ''}`} onClick={() => onTabChange('tasks')} title={t('tasks')}>
+      <button id="ri-tasks" className={`ri${activeTab === 'tasks' ? ' on' : ''}`} onClick={() => onTabChange('tasks')} title="Organise">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <polyline points="9 11 12 14 22 4"/>
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <line x1="8" y1="9" x2="16" y2="9"/>
+          <line x1="8" y1="13" x2="14" y2="13"/>
         </svg>
       </button>
 

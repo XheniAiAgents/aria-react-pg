@@ -91,6 +91,19 @@ async def init_db():
             )
         """)
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS notes (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL,
+                title      TEXT    NOT NULL DEFAULT 'Untitled',
+                content    TEXT    NOT NULL DEFAULT '',
+                tag        TEXT    DEFAULT 'personal',
+                color      TEXT    DEFAULT 'gold',
+                updated_at TEXT    DEFAULT (datetime('now')),
+                created_at TEXT    DEFAULT (datetime('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS link_codes (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id    INTEGER NOT NULL,
@@ -128,6 +141,12 @@ async def init_db():
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
+        # Migration: add color column to notes if it doesn't exist
+        try:
+            await db.execute("ALTER TABLE notes ADD COLUMN color TEXT DEFAULT 'gold'")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
         await db.commit()
 
 
@@ -692,4 +711,42 @@ async def cleanup_old_data():
             DELETE FROM link_codes
             WHERE datetime(created_at, '+10 minutes') < datetime('now')
         """)
+        await db.commit()
+
+
+# ── Notes ─────────────────────────────────────────────────────────────────────
+
+async def get_notes(user_id: int) -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, title, content, tag, color, created_at, updated_at FROM notes WHERE user_id = ? ORDER BY updated_at DESC",
+            (user_id,)
+        ) as c:
+            return [dict(r) for r in await c.fetchall()]
+
+
+async def add_note(user_id: int, title: str, content: str = "", tag: str = "personal", color: str = "gold") -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "INSERT INTO notes (user_id, title, content, tag, color) VALUES (?, ?, ?, ?, ?) RETURNING id",
+            (user_id, title, content, tag, color)
+        ) as c:
+            row = await c.fetchone()
+            await db.commit()
+            return row[0] if row else None
+
+
+async def update_note(note_id: int, user_id: int, title: str, content: str, tag: str, color: str = "gold"):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE notes SET title=?, content=?, tag=?, color=?, updated_at=datetime('now') WHERE id=? AND user_id=?",
+            (title, content, tag, color, note_id, user_id)
+        )
+        await db.commit()
+
+
+async def delete_note(note_id: int, user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM notes WHERE id=? AND user_id=?", (note_id, user_id))
         await db.commit()

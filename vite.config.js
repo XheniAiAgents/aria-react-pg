@@ -13,6 +13,7 @@ export default defineConfig({
       '/memories': 'http://localhost:8000',
       '/email': 'http://localhost:8000',
       '/link': 'http://localhost:8000',
+      '/notes': 'http://localhost:8000',
     }
   }
 })

@@ -43,6 +43,7 @@ from backend.database import (
     ensure_email_account_table, save_email_account,
     get_email_account, delete_email_account,
     verify_password, hash_password,
+    get_notes, add_note, update_note, delete_note,
 )
 from backend.aria import chat
 from backend.email_service import send_welcome_email, send_reset_email, send_digest_email
@@ -548,6 +549,47 @@ async def verify_link(code: str, telegram_id: str):
         raise HTTPException(400, "Invalid or expired code")
     return {"status": "linked", "user": result}
     
+
+
+# ── Notes ─────────────────────────────────────────────────────────────────────
+
+class NoteCreate(BaseModel):
+    user_id: int
+    title: str = "Untitled"
+    content: str = ""
+    tag: str = "personal"
+    color: str = "gold"
+
+class NoteUpdate(BaseModel):
+    user_id: int
+    title: str
+    content: str
+    tag: str = "personal"
+    color: str = "gold"
+
+
+@app.get("/notes/{user_id}")
+async def get_notes_endpoint(user_id: int):
+    return {"notes": await get_notes(user_id)}
+
+
+@app.post("/notes")
+async def create_note(req: NoteCreate):
+    note_id = await add_note(req.user_id, req.title, req.content, req.tag, req.color)
+    return {"note_id": note_id}
+
+
+@app.put("/notes/{note_id}")
+async def update_note_endpoint(note_id: int, req: NoteUpdate):
+    await update_note(note_id, req.user_id, req.title, req.content, req.tag, req.color)
+    return {"status": "updated"}
+
+
+@app.delete("/notes/{note_id}")
+async def delete_note_endpoint(note_id: int, user_id: int):
+    await delete_note(note_id, user_id)
+    return {"status": "deleted"}
+
 @app.post("/chat/file")
 async def chat_with_file(
     user_id: int = Form(...),
