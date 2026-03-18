@@ -270,12 +270,20 @@ export default function NotesView({ API, userId, visible, showToast }) {
       } else {
         const newRow = document.createElement('div');
         newRow.className = 'note-checkbox-row';
-        newRow.innerHTML = '<input type="checkbox" class="note-cb-input"> <span class="note-cb-text"></span>';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.className = 'note-cb-input';
+        const sp = document.createElement('span');
+        sp.className = 'note-cb-text';
+        const tn = document.createTextNode('');
+        sp.appendChild(tn);
+        newRow.appendChild(cb);
+        newRow.appendChild(document.createTextNode(' '));
+        newRow.appendChild(sp);
         row.insertAdjacentElement('afterend', newRow);
-        const newSpan = newRow.querySelector('.note-cb-text');
         const range = document.createRange();
-        range.setStart(newSpan, 0); range.collapse(true);
+        range.setStart(tn, 0); range.collapse(true);
         sel.removeAllRanges(); sel.addRange(range);
+        editorRef.current?.focus();
       }
       contentRef.current = editorRef.current?.innerHTML || '';
       scheduleAutoSave(editTitle, editTag, editColor);
@@ -381,7 +389,11 @@ export default function NotesView({ API, userId, visible, showToast }) {
           {/* Color header */}
           <div className="notes-editor-header"
             style={{ background: currentColor.bg, borderBottomColor: currentColor.border }}>
-            <button className="notes-back-btn" onClick={() => setMobileEditorOpen(false)}>← Back</button>
+            <button className="notes-back-btn" onClick={() => {
+                setMobileEditorOpen(false);
+                setSelected(null);
+                if (editorRef.current) editorRef.current.innerHTML = '';
+              }}>← Back</button>
             <input
               className="notes-title-input"
               style={{ color: currentColor.text }}
@@ -422,8 +434,8 @@ export default function NotesView({ API, userId, visible, showToast }) {
                 {TAGS.map(tag => <option key={tag} value={tag}>{tag}</option>)}
               </select>
               <button className="notes-save-btn"
-                onMouseDown={e => { e.preventDefault(); saveNote(editTitle, editTag, editColor, true); }}>
-                {saving ? '…' : 'Save'}
+                onMouseDown={e => { e.preventDefault(); saveNote(editTitle, editTag, editColor, false); }}>
+                {saving ? 'Saved ✓' : 'Save'}
               </button>
               <button className="notes-delete-btn"
                 onMouseDown={e => { e.preventDefault(); deleteNote(); }}>
