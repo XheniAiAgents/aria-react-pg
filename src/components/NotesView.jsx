@@ -71,6 +71,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
   const [editColor, setEditColor] = useState('gold');
   const [saving, setSaving] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [mobileEditorOpen, setMobileEditorOpen] = useState(false);
   const editorRef = useRef(null);
   const saveTimer = useRef(null);
   const contentRef = useRef(''); // track content without re-renders
@@ -95,7 +96,9 @@ export default function NotesView({ API, userId, visible, showToast }) {
     // Set editor HTML after render
     setTimeout(() => {
       if (editorRef.current) {
-        editorRef.current.innerHTML = textToHtml(note.content || '');
+        // If content looks like HTML use it directly, otherwise convert from text
+        const c = note.content || '';
+        editorRef.current.innerHTML = c.startsWith('<') ? c : textToHtml(c);
       }
     }, 0);
   }
@@ -122,7 +125,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
     saveTimer.current = setTimeout(() => saveNote(title, tag, color), 1500);
   }
 
-  async function saveNote(title, tag, color) {
+  async function saveNote(title, tag, color, closeAfter = false) {
     const content = contentRef.current;
     if (!title.trim() && !content.trim()) return;
     setSaving(true);
@@ -143,6 +146,11 @@ export default function NotesView({ API, userId, visible, showToast }) {
         });
       }
       await loadNotes();
+      if (closeAfter) {
+        setSelected(null);
+        setMobileEditorOpen(false);
+        if (editorRef.current) editorRef.current.innerHTML = '';
+      }
     } catch { showToast('Error saving', true); }
     setSaving(false);
   }
@@ -151,7 +159,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
     if (!selected?.id) { setSelected(null); return; }
     try {
       await fetch(`${API}/notes/${selected.id}?user_id=${userId}`, { method: 'DELETE' });
-      setSelected(null);
+      setSelected(null); setMobileEditorOpen(false);
       if (editorRef.current) editorRef.current.innerHTML = '';
       await loadNotes();
       showToast('Note deleted.');
@@ -159,7 +167,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
   }
 
   function handleEditorInput() {
-    contentRef.current = editorRef.current?.innerText || '';
+    contentRef.current = editorRef.current?.innerHTML || '';
     scheduleAutoSave(editTitle, editTag, editColor);
   }
 
@@ -169,10 +177,51 @@ export default function NotesView({ API, userId, visible, showToast }) {
     document.execCommand(cmd, false, value);
   }
 
-  function insertList(type) {
-    editorRef.current?.focus();
-    if (type === 'ul') document.execCommand('insertUnorderedList', false, null);
-    else document.execCommand('insertOrderedList', false, null);
+  function insertListItem(type) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    const prefix = type === 'ul' ? '• ' : '1. ';
+    const row = document.createElement('div');
+    row.className = type === 'ul' ? 'note-ul-row' : 'note-ol-row';
+    row.setAttribute('data-list-type', type);
+
+    // For ol, count existing ol rows to get next number
+    if (type === 'ol') {
+      const olRows = editor.querySelectorAll('.note-ol-row');
+      row.setAttribute('data-num', olRows.length + 1);
+      row.setAttribute('data-prefix', (olRows.length + 1) + '. ');
+    } else {
+      row.setAttribute('data-prefix', '• ');
+    }
+
+    const textNode = document.createTextNode('');
+    row.appendChild(textNode);
+
+    const range = sel.getRangeAt(0);
+    let node = range.startContainer;
+    if (node.nodeType === 3) node = node.parentElement;
+    const block = node.closest('div, p, h1, h2, h3') || node;
+
+    if (block && block !== editor) {
+      block.insertAdjacentElement('afterend', row);
+    } else {
+      range.collapse(false);
+      range.insertNode(row);
+    }
+
+    const newRange = document.createRange();
+    newRange.setStart(textNode, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    editor.focus();
+
+    contentRef.current = editor.innerText || '';
+    scheduleAutoSave(editTitle, editTag, editColor);
   }
 
   function insertCheckbox() {
@@ -192,57 +241,87 @@ export default function NotesView({ API, userId, visible, showToast }) {
       sel.removeAllRanges();
       sel.addRange(range);
     }
-    contentRef.current = editorRef.current?.innerText || '';
+    contentRef.current = editorRef.current?.innerHTML || '';
     scheduleAutoSave(editTitle, editTag, editColor);
   }
 
   // ── Auto-continue lists on Enter ─────────────────────────────────────────
   function handleKeyDown(e) {
-    if (e.key === 'Enter') {
-      // Check if cursor is inside a checkbox row
-      const sel = window.getSelection();
-      if (sel.rangeCount) {
-        const node = sel.getRangeAt(0).startContainer;
-        const row = node.nodeType === 3
-          ? node.parentElement?.closest('.note-checkbox-row')
-          : node.closest?.('.note-checkbox-row');
-        if (row) {
-          e.preventDefault();
-          const span = row.querySelector('.note-cb-text');
-          // If checkbox row is empty, exit and insert normal line
-          if (!span?.textContent.trim()) {
-            const newDiv = document.createElement('div');
-            newDiv.innerHTML = '<br>';
-            row.replaceWith(newDiv);
-            const range = document.createRange();
-            range.setStart(newDiv, 0);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          } else {
-            // Insert new checkbox row after current one
-            const newRow = document.createElement('div');
-            newRow.className = 'note-checkbox-row';
-            newRow.innerHTML = '<input type="checkbox" class="note-cb-input"> <span class="note-cb-text"></span>';
-            row.insertAdjacentElement('afterend', newRow);
-            const newSpan = newRow.querySelector('.note-cb-text');
-            const range = document.createRange();
-            range.setStart(newSpan, 0);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          }
-          contentRef.current = editorRef.current?.innerText || '';
-          scheduleAutoSave(editTitle, editTag, editColor);
-          return;
-        }
+    if (e.key !== 'Enter') return;
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const node = sel.getRangeAt(0).startContainer;
+    const getEl = n => n.nodeType === 3 ? n.parentElement : n;
+
+    // ── Checkbox row ──
+    const row = getEl(node)?.closest('.note-checkbox-row');
+    if (row) {
+      e.preventDefault();
+      const span = row.querySelector('.note-cb-text');
+      if (!span?.textContent.trim()) {
+        const newDiv = document.createElement('div');
+        newDiv.innerHTML = '<br>';
+        row.replaceWith(newDiv);
+        const range = document.createRange();
+        range.setStart(newDiv, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      } else {
+        const newRow = document.createElement('div');
+        newRow.className = 'note-checkbox-row';
+        newRow.innerHTML = '<input type="checkbox" class="note-cb-input"> <span class="note-cb-text"></span>';
+        row.insertAdjacentElement('afterend', newRow);
+        const newSpan = newRow.querySelector('.note-cb-text');
+        const range = document.createRange();
+        range.setStart(newSpan, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
       }
-      // Let browser handle list continuation natively
-      setTimeout(() => {
-        contentRef.current = editorRef.current?.innerText || '';
-        scheduleAutoSave(editTitle, editTag, editColor);
-      }, 0);
+      contentRef.current = editorRef.current?.innerHTML || '';
+      scheduleAutoSave(editTitle, editTag, editColor);
+      return;
     }
+
+    // ── List row (ul/ol simulated with divs) ──
+    const listRow = getEl(node)?.closest('.note-ul-row, .note-ol-row');
+    if (listRow) {
+      e.preventDefault();
+      if (!listRow.textContent.trim()) {
+        // Empty row — exit list
+        const newDiv = document.createElement('div');
+        newDiv.innerHTML = '<br>';
+        listRow.replaceWith(newDiv);
+        const range = document.createRange();
+        range.setStart(newDiv, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      } else {
+        // Continue list
+        const type = listRow.getAttribute('data-list-type');
+        const newRow = document.createElement('div');
+        newRow.className = listRow.className;
+        newRow.setAttribute('data-list-type', type);
+        if (type === 'ol') {
+          const num = parseInt(listRow.getAttribute('data-num') || '1') + 1;
+          newRow.setAttribute('data-num', num);
+          newRow.setAttribute('data-prefix', num + '. ');
+        } else {
+          newRow.setAttribute('data-prefix', '• ');
+        }
+        const textNode = document.createTextNode('');
+        newRow.appendChild(textNode);
+        listRow.insertAdjacentElement('afterend', newRow);
+        const range = document.createRange();
+        range.setStart(textNode, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      }
+      contentRef.current = editorRef.current?.innerHTML || '';
+      scheduleAutoSave(editTitle, editTag, editColor);
+      return;
+    }
+
+    // ── Default ──
+    setTimeout(() => {
+      contentRef.current = editorRef.current?.innerHTML || '';
+      scheduleAutoSave(editTitle, editTag, editColor);
+    }, 0);
   }
 
   function fmtDate(str) {
@@ -266,13 +345,19 @@ export default function NotesView({ API, userId, visible, showToast }) {
         <div className="notes-list">
           {notes.length === 0 && <div className="notes-empty">No notes yet.<br />Create your first one!</div>}
           {notes.map(n => {
-            const c = NOTE_COLORS.find(x => x.id === (n.color || 'gold')) || NOTE_COLORS[0];
+            const colorId = n.color && n.color !== 'null' ? n.color : 'gold';
+            const c = NOTE_COLORS.find(x => x.id === colorId) || NOTE_COLORS[0];
             return (
               <div key={n.id}
                 className={`notes-item${selected?.id === n.id ? ' on' : ''}`}
                 onClick={() => openNote(n)}
-                style={selected?.id === n.id ? { borderColor: c.border, background: c.bg } : {}}>
-                <div className="notes-item-title" style={{ color: selected?.id === n.id ? c.text : '' }}>
+                style={{
+                  borderLeftColor: c.border,
+                  borderLeftWidth: '3px',
+                  borderLeftStyle: 'solid',
+                  ...(selected?.id === n.id ? { borderColor: c.border, background: c.bg } : {})
+                }}>
+                <div className="notes-item-title" style={{ color: c.text }}>
                   {n.title || 'Untitled'}
                 </div>
                 <div className="notes-item-preview">
@@ -290,10 +375,11 @@ export default function NotesView({ API, userId, visible, showToast }) {
 
       {/* Editor */}
       {selected ? (
-        <div className="notes-editor">
+        <div className={"notes-editor" + (mobileEditorOpen ? ' mobile-open' : '')}>
           {/* Color header */}
           <div className="notes-editor-header"
             style={{ background: currentColor.bg, borderBottomColor: currentColor.border }}>
+            <button className="notes-back-btn" onClick={() => setMobileEditorOpen(false)}>← Back</button>
             <input
               className="notes-title-input"
               style={{ color: currentColor.text }}
@@ -334,7 +420,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
                 {TAGS.map(tag => <option key={tag} value={tag}>{tag}</option>)}
               </select>
               <button className="notes-save-btn"
-                onMouseDown={e => { e.preventDefault(); saveNote(editTitle, editTag, editColor); }}>
+                onMouseDown={e => { e.preventDefault(); saveNote(editTitle, editTag, editColor, true); }}>
                 {saving ? '…' : 'Save'}
               </button>
               <button className="notes-delete-btn"
@@ -351,8 +437,8 @@ export default function NotesView({ API, userId, visible, showToast }) {
             <button className="notes-tb-btn" title="Underline" onMouseDown={e => { e.preventDefault(); execCmd('underline'); }}><u>U</u></button>
             <button className="notes-tb-btn" title="Strikethrough" onMouseDown={e => { e.preventDefault(); execCmd('strikeThrough'); }}><s>S</s></button>
             <div className="notes-tb-sep" />
-            <button className="notes-tb-btn" title="Bullet list" onMouseDown={e => { e.preventDefault(); insertList('ul'); }}>—</button>
-            <button className="notes-tb-btn" title="Numbered list" onMouseDown={e => { e.preventDefault(); insertList('ol'); }}>1.</button>
+            <button className="notes-tb-btn" title="Bullet list" onMouseDown={e => { e.preventDefault(); insertListItem('ul'); }}>—</button>
+            <button className="notes-tb-btn" title="Numbered list" onMouseDown={e => { e.preventDefault(); insertListItem('ol'); }}>1.</button>
             <button className="notes-tb-btn" title="Checkbox" onMouseDown={e => { e.preventDefault(); insertCheckbox(); }}>☐</button>
             <div className="notes-tb-sep" />
             <button className="notes-tb-btn" title="Heading 1" onMouseDown={e => { e.preventDefault(); execCmd('formatBlock', 'h1'); }}>H1</button>
