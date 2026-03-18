@@ -185,7 +185,9 @@ export default function NotesView({ API, userId, visible, showToast }) {
     if (row) {
       e.preventDefault();
       const span = row.querySelector('.note-cb-text');
-      if (!span?.textContent.trim()) {
+      // Check both span text and full row text (iOS puts text directly in row sometimes)
+      const rowText = (span?.textContent || '') + (row.textContent || '');
+      if (!rowText.replace(/[\s\u200B]/g, '').length) {
         const newDiv = document.createElement('div');
         newDiv.innerHTML = '<br>';
         row.insertAdjacentElement('afterend', newDiv);
@@ -305,23 +307,45 @@ export default function NotesView({ API, userId, visible, showToast }) {
   }
 
   function insertCheckbox() {
-    editorRef.current?.focus();
-    const checkbox = document.createElement('div');
-    checkbox.className = 'note-checkbox-row';
-    checkbox.innerHTML = '<input type="checkbox" class="note-cb-input"> <span class="note-cb-text"></span>';
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+
+    // Build checkbox row with a real text node for reliable cursor placement
+    const row = document.createElement('div');
+    row.className = 'note-checkbox-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'note-cb-input';
+    const sp = document.createElement('span');
+    sp.className = 'note-cb-text';
+    // Add zero-width space so mobile cursor lands here reliably
+    const tn = document.createTextNode('​');
+    sp.appendChild(tn);
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(' '));
+    row.appendChild(sp);
+
     const sel = window.getSelection();
     if (sel.rangeCount) {
       const range = sel.getRangeAt(0);
-      range.collapse(false);
-      range.insertNode(checkbox);
-      // Move cursor to text span
-      const span = checkbox.querySelector('.note-cb-text');
-      range.setStart(span, 0);
-      range.collapse(true);
+      let node = range.startContainer;
+      if (node.nodeType === 3) node = node.parentElement;
+      const block = node.closest('div, p, h1, h2, h3') || node;
+      if (block && block !== editor) {
+        block.insertAdjacentElement('afterend', row);
+      } else {
+        range.collapse(false);
+        range.insertNode(row);
+      }
+      // Place cursor after zero-width space
+      const newRange = document.createRange();
+      newRange.setStart(tn, 1);
+      newRange.collapse(true);
       sel.removeAllRanges();
-      sel.addRange(range);
+      sel.addRange(newRange);
+      editor.focus();
     }
-    contentRef.current = editorRef.current?.innerHTML || '';
+    contentRef.current = editor.innerHTML || '';
     scheduleAutoSave(editTitle, editTag, editColor);
   }
 
