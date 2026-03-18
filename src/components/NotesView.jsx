@@ -112,6 +112,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
     setEditColor('gold');
     setIsNew(true);
     setShowColorPicker(false);
+    setMobileEditorOpen(true);
     contentRef.current = '';
     setTimeout(() => {
       if (editorRef.current) {
