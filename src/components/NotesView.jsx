@@ -92,6 +92,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
     setEditColor(note.color || 'gold');
     setIsNew(false);
     setShowColorPicker(false);
+    setMobileEditorOpen(true);
     contentRef.current = note.content || '';
     // Set editor HTML after render
     setTimeout(() => {
@@ -361,7 +362,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
                   {n.title || 'Untitled'}
                 </div>
                 <div className="notes-item-preview">
-                  {n.content?.slice(0, 60).replace(/[#*`_~\[\]]/g, '') || '…'}
+                  {(n.content || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().slice(0, 60) || '…'}
                 </div>
                 <div className="notes-item-footer">
                   <span className={`notes-tag notes-tag-${n.tag}`}>{n.tag}</span>
