@@ -173,6 +173,84 @@ export default function NotesView({ API, userId, visible, showToast }) {
     scheduleAutoSave(editTitle, editTag, editColor);
   }
 
+  function handleBeforeInput(e) {
+    if (e.inputType !== 'insertParagraph' && e.inputType !== 'insertLineBreak') return;
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+    const node = sel.getRangeAt(0).startContainer;
+    const getEl = n => n.nodeType === 3 ? n.parentElement : n;
+
+    // Checkbox row
+    const row = getEl(node)?.closest('.note-checkbox-row');
+    if (row) {
+      e.preventDefault();
+      const span = row.querySelector('.note-cb-text');
+      if (!span?.textContent.trim()) {
+        const newDiv = document.createElement('div');
+        newDiv.innerHTML = '<br>';
+        row.insertAdjacentElement('afterend', newDiv);
+        row.remove();
+        const range = document.createRange();
+        range.setStart(newDiv, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      } else {
+        const newRow = document.createElement('div');
+        newRow.className = 'note-checkbox-row';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.className = 'note-cb-input';
+        const sp = document.createElement('span');
+        sp.className = 'note-cb-text';
+        const tn = document.createTextNode('');
+        sp.appendChild(tn);
+        newRow.appendChild(cb);
+        newRow.appendChild(document.createTextNode(' '));
+        newRow.appendChild(sp);
+        row.insertAdjacentElement('afterend', newRow);
+        const range = document.createRange();
+        range.setStart(tn, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+        editorRef.current?.focus();
+      }
+      contentRef.current = editorRef.current?.innerHTML || '';
+      scheduleAutoSave(editTitle, editTag, editColor);
+      return;
+    }
+
+    // List rows
+    const listRow = getEl(node)?.closest('.note-ul-row, .note-ol-row');
+    if (listRow) {
+      e.preventDefault();
+      if (!listRow.textContent.trim()) {
+        const newDiv = document.createElement('div');
+        newDiv.innerHTML = '<br>';
+        listRow.replaceWith(newDiv);
+        const range = document.createRange();
+        range.setStart(newDiv, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      } else {
+        const type = listRow.getAttribute('data-list-type');
+        const newRow = document.createElement('div');
+        newRow.className = listRow.className;
+        newRow.setAttribute('data-list-type', type);
+        if (type === 'ol') {
+          const num = parseInt(listRow.getAttribute('data-num') || '1') + 1;
+          newRow.setAttribute('data-num', num);
+          newRow.setAttribute('data-prefix', num + '. ');
+        } else {
+          newRow.setAttribute('data-prefix', '• ');
+        }
+        const tn = document.createTextNode('');
+        newRow.appendChild(tn);
+        listRow.insertAdjacentElement('afterend', newRow);
+        const range = document.createRange();
+        range.setStart(tn, 0); range.collapse(true);
+        sel.removeAllRanges(); sel.addRange(range);
+      }
+      contentRef.current = editorRef.current?.innerHTML || '';
+      scheduleAutoSave(editTitle, editTag, editColor);
+    }
+  }
+
   // ── Toolbar commands ─────────────────────────────────────────────────────
   function execCmd(cmd, value = null) {
     editorRef.current?.focus();
@@ -468,6 +546,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
             suppressContentEditableWarning
             onInput={handleEditorInput}
             onKeyDown={handleKeyDown}
+            onBeforeInput={handleBeforeInput}
             data-placeholder="Write your note here…"
           />
         </div>
