@@ -168,6 +168,89 @@ export default function NotesView({ API, userId, visible, showToast }) {
     } catch { showToast('Error deleting', true); }
   }
 
+  // ── Toolbar commands ─────────────────────────────────────────────────────
+  function execCmd(cmd, value = null) {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, value);
+    contentRef.current = editorRef.current?.innerHTML || '';
+    scheduleAutoSave(editTitle, editTag, editColor);
+  }
+
+  function insertListItem(type) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    const list = document.createElement(type);
+    const li = document.createElement('li');
+    const tn = document.createTextNode('');
+    li.appendChild(tn);
+    list.appendChild(li);
+
+    const range = sel.getRangeAt(0);
+    let node = range.startContainer;
+    if (node.nodeType === 3) node = node.parentElement;
+    const block = node.closest('div, p, h1, h2, h3') || node;
+
+    if (block && block !== editor) {
+      block.insertAdjacentElement('afterend', list);
+    } else {
+      range.collapse(false);
+      range.insertNode(list);
+    }
+
+    const newRange = document.createRange();
+    newRange.setStart(tn, 0);
+    newRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+    editor.focus();
+    contentRef.current = editor.innerHTML || '';
+    scheduleAutoSave(editTitle, editTag, editColor);
+  }
+
+  function insertCheckbox() {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+
+    const row = document.createElement('div');
+    row.className = 'note-checkbox-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.className = 'note-cb-input';
+    const sp = document.createElement('span');
+    sp.className = 'note-cb-text';
+    const tn = document.createTextNode('');
+    sp.appendChild(tn);
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(' '));
+    row.appendChild(sp);
+
+    const sel = window.getSelection();
+    if (sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      let node = range.startContainer;
+      if (node.nodeType === 3) node = node.parentElement;
+      const block = node.closest('div, p, h1, h2, h3') || node;
+      if (block && block !== editor) {
+        block.insertAdjacentElement('afterend', row);
+      } else {
+        range.collapse(false);
+        range.insertNode(row);
+      }
+      const newRange = document.createRange();
+      newRange.setStart(tn, 0);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      editor.focus();
+    }
+    contentRef.current = editor.innerHTML || '';
+    scheduleAutoSave(editTitle, editTag, editColor);
+  }
+
   function handleEditorInput() {
     contentRef.current = editorRef.current?.innerHTML || '';
     scheduleAutoSave(editTitle, editTag, editColor);
