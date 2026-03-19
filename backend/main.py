@@ -46,6 +46,7 @@ from backend.database import (
     get_notes, add_note, update_note, delete_note,
 )
 from backend.aria import chat
+from backend.database import get_conversation_history
 from backend.email_service import send_welcome_email, send_reset_email, send_digest_email
 from backend.email_digest import summarize_emails
 from backend.google_oauth import get_auth_url, exchange_code, get_gmail_address, fetch_todays_emails_oauth
@@ -236,6 +237,12 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "4.0", "time": datetime.now().isoformat()}
+
+
+@app.get("/history/{user_id}")
+async def get_history(user_id: int, mode: str = "work", limit: int = 30):
+    history = await get_conversation_history(user_id, mode=mode, limit=limit)
+    return {"messages": history}
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -606,29 +613,22 @@ async def chat_with_file(
         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
 
     if extracted["type"] == "image":
-        import anthropic
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        from groq import Groq
+        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
         user_prompt = message if message.strip() else "Describe this image and extract any useful information."
         try:
-            response = client.messages.create(
-                model="claude-haiku-4-5",
+            response = client.chat.completions.create(
+                model="meta-llama/llama-4-scout-17b-16e-instruct",
                 max_tokens=1024,
                 messages=[{
                     "role": "user",
                     "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": extracted["mime_type"],
-                                "data": extracted["b64"]
-                            }
-                        },
+                        {"type": "image_url", "image_url": {"url": f"data:{extracted['mime_type']};base64,{extracted['b64']}"}},
                         {"type": "text", "text": user_prompt}
                     ]
                 }]
             )
-            aria_response = response.content[0].text
+            aria_response = response.choices[0].message.content
         except Exception:
             aria_response = f"I received your image ({extracted['name']}) but couldn't process it visually."
     else:

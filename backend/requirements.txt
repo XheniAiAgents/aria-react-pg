@@ -13,3 +13,5 @@ requests
 aiohttp
 slowapi
 httpx==0.27.0
+pypdf>=3.0.0
+python-docx
