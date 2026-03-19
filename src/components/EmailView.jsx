@@ -11,6 +11,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
   const [conversation, setConversation] = useState([]);
   const [askLoading, setAskLoading] = useState(false);
   const [emailsExpanded, setEmailsExpanded] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const msgsRef = useRef(null);
 
   const historyLoadedRef = useRef(false);
@@ -121,7 +122,16 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
                 <span>AI Summary</span>
                 <span style={{ color: 'var(--a2)' }}>{count} email{count !== 1 ? 's' : ''} today</span>
               </div>
-              <div className="email-summary-text">{summary}</div>
+              <div className="email-summary-text" style={{
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: summaryExpanded ? 'unset' : 2,
+                WebkitBoxOrient: 'vertical',
+              }}>{summary}</div>
+              <button onClick={() => setSummaryExpanded(e => !e)}
+                style={{ background: 'none', border: 'none', color: 'var(--a2)', fontSize: '11px', cursor: 'pointer', padding: '4px 0', letterSpacing: '0.05em' }}>
+                {summaryExpanded ? '▲ Less' : '▼ Read more'}
+              </button>
             </div>
           )}
           {!loading && !emails.length && (
