@@ -37,7 +37,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
           setConversation(prev => prev.length > 0 ? prev : history.map(m => ({
             role: m.role,
             text: m.content,
-            time: new Date(m.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            time: m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''
           })));
         }
       }
@@ -52,7 +52,12 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
       if (!data.connected) return;
       setLoading(true); setSummary(''); setEmails(''); setAskResponse('');
       const r = await fetch(`${API}/email/fetch?user_id=${userId}`);
-      if (!r.ok) { setLoading(false); return; }
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        setSummary(`Error loading emails: ${err.detail || r.status}`);
+        setLoading(false);
+        return;
+      }
       const json = await r.json();
       setEmails(json.emails || []); setSummary(json.summary || ''); setCount(json.count || 0);
       setLoading(false);
@@ -68,7 +73,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
     const userMsg = { role: 'user', text: q, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) };
     setConversation(c => [...c, userMsg]);
     try {
-      const fullQ = `[About my emails today]: ${q}`;
+      const fullQ = q;
       const { response } = await (await fetch(`${API}/chat`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: fullQ, user_id: userId, mode: 'email', lang })
