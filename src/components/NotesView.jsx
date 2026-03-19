@@ -234,7 +234,11 @@ export default function NotesView({ API, userId, visible, showToast }) {
       let node = range.startContainer;
       if (node.nodeType === 3) node = node.parentElement;
       const block = node.closest('div, p, h1, h2, h3') || node;
-      if (block && block !== editor) {
+
+      // If current block is empty, replace it with checkbox
+      if (block && block !== editor && !block.textContent.trim()) {
+        block.replaceWith(row);
+      } else if (block && block !== editor) {
         block.insertAdjacentElement('afterend', row);
       } else {
         range.collapse(false);
