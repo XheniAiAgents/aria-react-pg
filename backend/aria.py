@@ -40,7 +40,9 @@ PENDING TASKS:
 UPCOMING EVENTS:
 {events}
 
-GMAIL: {gmail}
+GMAIL STATUS: {gmail}
+- If Gmail is Connected: you CAN read the user's emails by emitting {{"action": "fetch_emails"}}. When the user asks about their emails, ALWAYS use this action — never say you don't have access.
+- If Gmail is Not connected: tell the user to connect Gmail in Settings.
 
 INTERNAL COMMANDS - include ONLY when genuinely needed, as raw JSON on its own line, nothing else around it:
 {{"action": "save_memory", "content": "...", "importance": "high|medium|low"}}
@@ -49,6 +51,7 @@ INTERNAL COMMANDS - include ONLY when genuinely needed, as raw JSON on its own l
 {{"action": "delete_task", "task_id": <id>}}
 {{"action": "delete_event", "event_id": <id>}}
 {{"action": "complete_task", "task_id": <id>}}
+{{"action": "fetch_emails"}}
 
 MEMORY RULES — what to save and what NOT to save:
 ALWAYS save as HIGH importance:
@@ -99,7 +102,9 @@ PENDING TASKS:
 UPCOMING EVENTS:
 {events}
 
-GMAIL: {gmail}
+GMAIL STATUS: {gmail}
+- If Gmail is Connected: you CAN read the user's emails by emitting {{"action": "fetch_emails"}}. When the user asks about their emails, ALWAYS use this action — never say you don't have access.
+- If Gmail is Not connected: tell the user to connect Gmail in Settings.
 
 INTERNAL COMMANDS - include ONLY when genuinely needed, as raw JSON on its own line:
 {{"action": "save_memory", "content": "...", "importance": "high|medium|low"}}
@@ -108,6 +113,7 @@ INTERNAL COMMANDS - include ONLY when genuinely needed, as raw JSON on its own l
 {{"action": "delete_task", "task_id": <id>}}
 {{"action": "delete_event", "event_id": <id>}}
 {{"action": "complete_task", "task_id": <id>}}
+{{"action": "fetch_emails"}}
 
 MEMORY RULES — what to save and what NOT to save:
 ALWAYS save as HIGH importance:
@@ -231,6 +237,28 @@ async def extract_and_execute_commands(text: str, user_id: int) -> str:
                 task_id = cmd.get("task_id")
                 if task_id:
                     await complete_task(int(task_id), user_id)
+            elif action == "fetch_emails":
+                try:
+                    from backend.google_oauth import fetch_todays_emails_oauth
+                    from backend.email_digest import summarize_emails
+                    import json as _json
+                    token = await get_google_token(user_id)
+                    if token:
+                        token_data = (
+                            _json.loads(token["token_data"])
+                            if isinstance(token["token_data"], str)
+                            else token["token_data"]
+                        )
+                        import asyncio as _asyncio
+                        emails = await _asyncio.get_event_loop().run_in_executor(
+                            None, fetch_todays_emails_oauth, token_data
+                        )
+                        summary = await _asyncio.get_event_loop().run_in_executor(
+                            None, summarize_emails, emails, "the user"
+                        )
+                        text = text + f"\n\nEMAIL_SUMMARY_RESULT:\n{summary}"
+                except Exception as e:
+                    print(f"[fetch_emails] Error: {e}")
         except Exception:
             pass
 
@@ -300,6 +328,27 @@ async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = 
 
     raw = response.content[0].text
     clean = await extract_and_execute_commands(raw, user_id)
-    await save_message(user_id, "assistant", clean, mode)
 
+    # Handle email summary result
+    if "EMAIL_SUMMARY_RESULT:" in clean:
+        parts = clean.split("EMAIL_SUMMARY_RESULT:", 1)
+        email_summary = parts[1].strip()
+        clean = parts[0].strip()
+        if email_summary:
+            followup_messages = messages + [
+                {"role": "assistant", "content": raw},
+                {"role": "user", "content": f"[SYSTEM: Email fetch complete. Share this summary naturally with the user:]\n{email_summary}"}
+            ]
+            followup = get_client().messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=1024,
+                system=system,
+                messages=followup_messages
+            )
+            clean = clean_response(followup.content[0].text)
+
+    if not clean:
+        clean = "Done."
+
+    await save_message(user_id, "assistant", clean, mode)
     return clean

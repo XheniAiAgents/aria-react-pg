@@ -17,18 +17,64 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
   useEffect(() => { scrollDown(); }, [messages, scrollDown]);
 
-  // Welcome message
+  // Load history or show welcome message
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    const h = new Date().getHours();
-    const g = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-    const name = JSON.parse(localStorage.getItem('aria_user') || '{}').name || '';
-    const work = [`${g}, ${name}.\n\nWhat are we working on today?`, `${g}, ${name}. Ready when you are.\n\nWhat needs your attention first?`];
-    const life = [`${g}, ${name} 🌿\n\n¿Qué tal? What's on your mind?`, `${g}, ${name}.\n\nHere whenever you need me.`];
-    const pool = mode === 'work' ? work : life;
-    const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    setMessages([{ type: 'aria', text: pool[Math.floor(Math.random() * pool.length)], time }]);
+
+    function getWelcome() {
+      const h = new Date().getHours();
+      const g = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      const name = JSON.parse(localStorage.getItem('aria_user') || '{}').name || '';
+      const work = [`${g}, ${name}.\n\nWhat are we working on today?`, `${g}, ${name}. Ready when you are.\n\nWhat needs your attention first?`];
+      const life = [`${g}, ${name} 🌿\n\n¿Qué tal? What\'s on your mind?`, `${g}, ${name}.\n\nHere whenever you need me.`];
+      const pool = mode === 'work' ? work : life;
+      const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return { type: 'aria', text: pool[Math.floor(Math.random() * pool.length)], time };
+    }
+
+    function isNewSession(lastMsgDate) {
+      if (!lastMsgDate) return true;
+      const last = new Date(lastMsgDate);
+      const now = new Date();
+      // New session if: different day AND current time is after 7:00am
+      const differentDay = last.toDateString() !== now.toDateString();
+      const afterSevenAm = now.getHours() >= 7;
+      // Or more than 8 hours have passed
+      const hoursElapsed = (now - last) / (1000 * 60 * 60);
+      return (differentDay && afterSevenAm) || hoursElapsed >= 8;
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch(`${API}/history/${userId}?mode=${mode}&limit=30`);
+        if (res.ok) {
+          const { messages: history } = await res.json();
+          if (history && history.length > 0) {
+            const loaded = history.map(m => ({
+              type: m.role === 'user' ? 'user' : 'aria',
+              text: m.content,
+              time: new Date(m.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+              created_at: m.created_at
+            }));
+            // Check if we should show welcome message
+            const lastMsg = history[history.length - 1];
+            if (isNewSession(lastMsg?.created_at)) {
+              // New session — show welcome then history
+              setMessages([getWelcome(), ...loaded]);
+            } else {
+              // Same session — just show history
+              setMessages(loaded);
+            }
+            return;
+          }
+        }
+      } catch {}
+      // No history — show welcome message
+      setMessages([getWelcome()]);
+    }
+
+    loadHistory();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
