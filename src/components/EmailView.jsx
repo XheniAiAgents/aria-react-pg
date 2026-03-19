@@ -50,7 +50,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
       const data = await res.json();
       setConnected(data.connected);
       if (!data.connected) return;
-      setLoading(true); setSummary(''); setEmails(''); setAskResponse('');
+      setLoading(true); setSummary(''); setEmails([]);
       const r = await fetch(`${API}/email/fetch?user_id=${userId}`);
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
