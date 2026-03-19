@@ -1,9 +1,3 @@
-# ══ ADD THESE IMPORTS to the top of main.py ══
-# from fastapi import File, UploadFile, Form
-# from file_handler import extract_text_from_file
-
-# ══ ADD THIS ENDPOINT to main.py ══
-
 @app.post("/chat/file")
 async def chat_with_file(
     user_id: int = Form(...),
@@ -12,7 +6,6 @@ async def chat_with_file(
     message: str = Form(""),
     file: UploadFile = File(...),
 ):
-    """Chat with an attached file (PDF, DOCX, image, txt, etc.)"""
     try:
         file_bytes = await file.read()
         mime_type = file.content_type or ""
@@ -21,36 +14,32 @@ async def chat_with_file(
         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
 
     if extracted["type"] == "image":
-        # Use Groq vision model for images
-        from groq import Groq
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         user_prompt = message if message.strip() else "Describe this image and extract any useful information."
         try:
-            response = client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
+            response = client.messages.create(
+                model="claude-haiku-4-5",
                 max_tokens=1024,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{extracted['mime_type']};base64,{extracted['b64']}"
-                                }
-                            },
-                            {"type": "text", "text": user_prompt}
-                        ]
-                    }
-                ]
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": extracted["mime_type"],
+                                "data": extracted["b64"]
+                            }
+                        },
+                        {"type": "text", "text": user_prompt}
+                    ]
+                }]
             )
-            aria_response = response.choices[0].message.content
+            aria_response = response.content[0].text
         except Exception as e:
-            # Fallback if vision model unavailable
             aria_response = f"I received your image ({extracted['name']}) but couldn't process it visually. Try describing what you need help with."
-
     else:
-        # Document — inject text into chat context
         file_context = (
             f"[ATTACHED FILE: {extracted['name']}]\n"
             f"{extracted['text']}\n"
