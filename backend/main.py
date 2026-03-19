@@ -606,22 +606,29 @@ async def chat_with_file(
         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
 
     if extracted["type"] == "image":
-        from groq import Groq
-        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        import anthropic
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         user_prompt = message if message.strip() else "Describe this image and extract any useful information."
         try:
-            response = client.chat.completions.create(
-                model="meta-llama/llama-4-scout-17b-16e-instruct",
+            response = client.messages.create(
+                model="claude-haiku-4-5",
                 max_tokens=1024,
                 messages=[{
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:{extracted['mime_type']};base64,{extracted['b64']}"}},
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": extracted["mime_type"],
+                                "data": extracted["b64"]
+                            }
+                        },
                         {"type": "text", "text": user_prompt}
                     ]
                 }]
             )
-            aria_response = response.choices[0].message.content
+            aria_response = response.content[0].text
         except Exception:
             aria_response = f"I received your image ({extracted['name']}) but couldn't process it visually."
     else:
