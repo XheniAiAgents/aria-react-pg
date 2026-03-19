@@ -79,15 +79,13 @@ def summarize_emails(emails: list[dict], user_name: str) -> str:
     for i, e in enumerate(emails, 1):
         email_text += f"\n--- Email {i} ---\nFrom: {e['from']}\nSubject: {e['subject']}\nBody: {e['body'][:500]}\n"
 
-    prompt = f"""You are ARIA, a personal AI assistant. The user is {user_name}.
-Summarize the following {len(emails)} emails received today in a clear, friendly digest.
-Group by topic/sender if relevant. Highlight anything urgent or important.
-Keep it concise — bullet points with brief context. End with a one-line overall impression.
+    prompt = f"""You are ARIA. Summarize these {len(emails)} emails for {user_name} in max 3 bullet points.
+Be very brief — one short line per email. Flag anything urgent with ⚠️.
 
 EMAILS:
 {email_text}
 
-Write the summary now:"""
+Write the summary now (max 3 bullets, very short):"""
 
     client = get_client()
     response = client.messages.create(

@@ -10,6 +10,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
   const [askInput, setAskInput] = useState('');
   const [conversation, setConversation] = useState([]);
   const [askLoading, setAskLoading] = useState(false);
+  const [emailsExpanded, setEmailsExpanded] = useState(false);
   const msgsRef = useRef(null);
 
   const historyLoadedRef = useRef(false);
@@ -126,13 +127,21 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
           {!loading && !emails.length && (
             <div style={{ fontSize: '12px', color: 'var(--ghost)', fontStyle: 'italic', padding: '8px 0' }}>No emails today.</div>
           )}
-          {!loading && emails.map && emails.map((e, i) => (
-            <div key={i} className="email-item">
-              <div className="email-item-from">{e.from.split('<')[0].trim()}</div>
-              <div className="email-item-subject">{e.subject}</div>
-              <div className="email-item-date">{e.date}</div>
-            </div>
-          ))}
+          {!loading && emails.length > 0 && (
+            <>
+              <button onClick={() => setEmailsExpanded(e => !e)}
+                style={{ background: 'none', border: 'none', color: 'var(--a2)', fontSize: '11px', cursor: 'pointer', padding: '4px 0', textAlign: 'left', letterSpacing: '0.05em' }}>
+                {emailsExpanded ? '▲ Hide emails' : `▼ Show ${emails.length} email${emails.length !== 1 ? 's' : ''}`}
+              </button>
+              {emailsExpanded && emails.map((e, i) => (
+                <div key={i} className="email-item">
+                  <div className="email-item-from">{e.from.split('<')[0].trim()}</div>
+                  <div className="email-item-subject">{e.subject}</div>
+                  <div className="email-item-date">{e.date}</div>
+                </div>
+              ))}
+            </>
+          )}
 
           {/* Email conversation */}
           {conversation.length > 0 && (
