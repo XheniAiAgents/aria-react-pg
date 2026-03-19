@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fmt } from '../utils/helpers';
 
 export default function EmailView({ API, userId, lang, visible, showToast, onOpenSettings, t }) {
@@ -8,10 +8,41 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [askInput, setAskInput] = useState('');
-  const [askResponse, setAskResponse] = useState('');
+  const [conversation, setConversation] = useState([]);
   const [askLoading, setAskLoading] = useState(false);
+  const msgsRef = useRef(null);
 
-  useEffect(() => { if (visible) loadEmailView(); }, [visible]);
+  const historyLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
+  }, [conversation]);
+
+  useEffect(() => {
+    if (visible) {
+      loadEmailView();
+      if (!historyLoadedRef.current) {
+        historyLoadedRef.current = true;
+        loadHistory();
+      }
+    }
+  }, [visible]);
+
+  async function loadHistory() {
+    try {
+      const res = await fetch(`${API}/history/${userId}?mode=email&limit=20`);
+      if (res.ok) {
+        const { messages: history } = await res.json();
+        if (history && history.length > 0) {
+          setConversation(prev => prev.length > 0 ? prev : history.map(m => ({
+            role: m.role,
+            text: m.content,
+            time: new Date(m.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+          })));
+        }
+      }
+    } catch {}
+  }
 
   async function loadEmailView() {
     try {
@@ -33,15 +64,16 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
     if (!q) return;
     if (!connected) { showToast('Connect your Gmail first.', true); return; }
     setAskInput('');
-    setAskResponse('');
     setAskLoading(true);
+    const userMsg = { role: 'user', text: q, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) };
+    setConversation(c => [...c, userMsg]);
     try {
       const fullQ = `[About my emails today]: ${q}`;
       const { response } = await (await fetch(`${API}/chat`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: fullQ, user_id: userId, mode: 'email', lang })
       })).json();
-      setAskResponse(response);
+      setConversation(c => [...c, { role: 'assistant', text: response, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
     } catch { showToast('Cannot reach ARIA.', true); }
     finally { setAskLoading(false); }
   }
@@ -97,17 +129,33 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
             </div>
           ))}
 
-          {/* Inline ARIA response — stays in email view */}
-          {askLoading && (
+          {/* Email conversation */}
+          {conversation.length > 0 && (
+            <div ref={msgsRef} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+              {conversation.map((m, i) => m.role === 'user' ? (
+                <div key={i} className="umsg"><div className="u-bubble">{m.text}</div></div>
+              ) : (
+                <div key={i} className="amsg">
+                  <div className="a-orb">A</div>
+                  <div>
+                    <div className="a-meta">ARIA <span className="a-time">{m.time}</span></div>
+                    <div className="a-bubble" dangerouslySetInnerHTML={{ __html: fmt(m.text) }} />
+                  </div>
+                </div>
+              ))}
+              {askLoading && (
+                <div className="typing">
+                  <div className="a-orb">A</div>
+                  <div className="t-bubble"><div className="td"/><div className="td"/><div className="td"/></div>
+                </div>
+              )}
+            </div>
+          )}
+          {!conversation.length && askLoading && (
             <div className="email-loading" style={{ marginTop: '16px' }}>
               <div className="td"/><div className="td"/><div className="td"/>
               <span>ARIA is thinking…</span>
             </div>
-          )}
-          {askResponse && !askLoading && (
-            <div style={{ marginTop: '16px', padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--a-line)', borderRadius: '12px', fontSize: '13px', lineHeight: 1.8, color: 'var(--mist)', whiteSpace: 'pre-wrap' }}
-              dangerouslySetInnerHTML={{ __html: fmt(askResponse) }}
-            />
           )}
 
           <div className="email-ask-bar">
