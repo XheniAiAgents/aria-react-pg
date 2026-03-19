@@ -39,7 +39,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
       const fullQ = `[About my emails today]: ${q}`;
       const { response } = await (await fetch(`${API}/chat`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: fullQ, user_id: userId, mode: 'work', lang })
+        body: JSON.stringify({ message: fullQ, user_id: userId, mode: 'email', lang })
       })).json();
       setAskResponse(response);
     } catch { showToast('Cannot reach ARIA.', true); }
