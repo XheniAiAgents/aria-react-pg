@@ -173,270 +173,104 @@ export default function NotesView({ API, userId, visible, showToast }) {
     scheduleAutoSave(editTitle, editTag, editColor);
   }
 
+  function handleEnter(e) {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    // Walk up from cursor to find checkbox or list row
+    let node = sel.getRangeAt(0).startContainer;
+    while (node && node !== editor) {
+      if (node.nodeType === 1 && node.classList) {
+        if (node.classList.contains('note-checkbox-row')) {
+          e.preventDefault();
+          const text = node.textContent.replace(/[\u200B\u00A0\s]/g, '');
+          if (!text) {
+            const newDiv = document.createElement('div');
+            newDiv.innerHTML = '<br>';
+            node.insertAdjacentElement('afterend', newDiv);
+            node.remove();
+            const r = document.createRange();
+            r.setStart(newDiv, 0); r.collapse(true);
+            sel.removeAllRanges(); sel.addRange(r);
+          } else {
+            const newRow = document.createElement('div');
+            newRow.className = 'note-checkbox-row';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.className = 'note-cb-input';
+            const sp = document.createElement('span');
+            sp.className = 'note-cb-text';
+            newRow.appendChild(cb);
+            newRow.appendChild(document.createTextNode(' '));
+            newRow.appendChild(sp);
+            node.insertAdjacentElement('afterend', newRow);
+            const r = document.createRange();
+            r.setStart(sp, 0); r.collapse(true);
+            sel.removeAllRanges(); sel.addRange(r);
+            editor.focus();
+          }
+          contentRef.current = editor.innerHTML || '';
+          scheduleAutoSave(editTitle, editTag, editColor);
+          return;
+        }
+        if (node.classList.contains('note-ul-row') || node.classList.contains('note-ol-row')) {
+          e.preventDefault();
+          const text = node.textContent.replace(/[\u200B\u00A0\s]/g, '');
+          if (!text) {
+            const newDiv = document.createElement('div');
+            newDiv.innerHTML = '<br>';
+            node.insertAdjacentElement('afterend', newDiv);
+            node.remove();
+            const r = document.createRange();
+            r.setStart(newDiv, 0); r.collapse(true);
+            sel.removeAllRanges(); sel.addRange(r);
+          } else {
+            const type = node.getAttribute('data-list-type');
+            const newRow = document.createElement('div');
+            newRow.className = node.className;
+            newRow.setAttribute('data-list-type', type);
+            if (type === 'ol') {
+              const num = parseInt(node.getAttribute('data-num') || '1') + 1;
+              newRow.setAttribute('data-num', num);
+              newRow.setAttribute('data-prefix', num + '. ');
+            } else {
+              newRow.setAttribute('data-prefix', '• ');
+            }
+            const tn = document.createTextNode('');
+            newRow.appendChild(tn);
+            node.insertAdjacentElement('afterend', newRow);
+            const r = document.createRange();
+            r.setStart(tn, 0); r.collapse(true);
+            sel.removeAllRanges(); sel.addRange(r);
+          }
+          contentRef.current = editor.innerHTML || '';
+          scheduleAutoSave(editTitle, editTag, editColor);
+          return;
+        }
+      }
+      node = node.parentNode;
+    }
+  }
+
   function handleBeforeInput(e) {
-    if (e.inputType !== 'insertParagraph' && e.inputType !== 'insertLineBreak') return;
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return;
-    const node = sel.getRangeAt(0).startContainer;
-    const getEl = n => n.nodeType === 3 ? n.parentElement : n;
-
-    // Checkbox row
-    const row = getEl(node)?.closest('.note-checkbox-row');
-    if (row) {
-      e.preventDefault();
-      const span = row.querySelector('.note-cb-text');
-      // Check both span text and full row text (iOS puts text directly in row sometimes)
-      const visibleText = (row.textContent || '').replace(/[\u200B\u00A0\s]/g, '');
-      if (!visibleText.length) {
-        const newDiv = document.createElement('div');
-        newDiv.innerHTML = '<br>';
-        row.insertAdjacentElement('afterend', newDiv);
-        row.remove();
-        const range = document.createRange();
-        range.setStart(newDiv, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-      } else {
-        const newRow = document.createElement('div');
-        newRow.className = 'note-checkbox-row';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.className = 'note-cb-input';
-        const sp = document.createElement('span');
-        sp.className = 'note-cb-text';
-        sp.setAttribute('contenteditable', 'true');
-        newRow.appendChild(cb);
-        newRow.appendChild(document.createTextNode(' '));
-        newRow.appendChild(sp);
-        row.insertAdjacentElement('afterend', newRow);
-        sp.focus();
-        const range = document.createRange();
-        range.selectNodeContents(sp);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-      contentRef.current = editorRef.current?.innerHTML || '';
-      scheduleAutoSave(editTitle, editTag, editColor);
-      return;
-    }
-
-    // List rows
-    const listRow = getEl(node)?.closest('.note-ul-row, .note-ol-row');
-    if (listRow) {
-      e.preventDefault();
-      if (!listRow.textContent.trim()) {
-        const newDiv = document.createElement('div');
-        newDiv.innerHTML = '<br>';
-        listRow.replaceWith(newDiv);
-        const range = document.createRange();
-        range.setStart(newDiv, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-      } else {
-        const type = listRow.getAttribute('data-list-type');
-        const newRow = document.createElement('div');
-        newRow.className = listRow.className;
-        newRow.setAttribute('data-list-type', type);
-        if (type === 'ol') {
-          const num = parseInt(listRow.getAttribute('data-num') || '1') + 1;
-          newRow.setAttribute('data-num', num);
-          newRow.setAttribute('data-prefix', num + '. ');
-        } else {
-          newRow.setAttribute('data-prefix', '• ');
-        }
-        const tn = document.createTextNode('');
-        newRow.appendChild(tn);
-        listRow.insertAdjacentElement('afterend', newRow);
-        const range = document.createRange();
-        range.setStart(tn, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-      }
-      contentRef.current = editorRef.current?.innerHTML || '';
-      scheduleAutoSave(editTitle, editTag, editColor);
+    if (e.inputType === 'insertParagraph' || e.inputType === 'insertLineBreak') {
+      handleEnter(e);
     }
   }
 
-  // ── Toolbar commands ─────────────────────────────────────────────────────
-  function execCmd(cmd, value = null) {
-    editorRef.current?.focus();
-    document.execCommand(cmd, false, value);
-  }
-
-  function insertListItem(type) {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.focus();
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return;
-
-    const prefix = type === 'ul' ? '• ' : '1. ';
-    const row = document.createElement('div');
-    row.className = type === 'ul' ? 'note-ul-row' : 'note-ol-row';
-    row.setAttribute('data-list-type', type);
-
-    // For ol, count existing ol rows to get next number
-    if (type === 'ol') {
-      const olRows = editor.querySelectorAll('.note-ol-row');
-      row.setAttribute('data-num', olRows.length + 1);
-      row.setAttribute('data-prefix', (olRows.length + 1) + '. ');
-    } else {
-      row.setAttribute('data-prefix', '• ');
-    }
-
-    const textNode = document.createTextNode('');
-    row.appendChild(textNode);
-
-    const range = sel.getRangeAt(0);
-    let node = range.startContainer;
-    if (node.nodeType === 3) node = node.parentElement;
-    const block = node.closest('div, p, h1, h2, h3') || node;
-
-    if (block && block !== editor) {
-      block.insertAdjacentElement('afterend', row);
-    } else {
-      range.collapse(false);
-      range.insertNode(row);
-    }
-
-    const newRange = document.createRange();
-    newRange.setStart(textNode, 0);
-    newRange.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-    editor.focus();
-
-    contentRef.current = editor.innerText || '';
-    scheduleAutoSave(editTitle, editTag, editColor);
-  }
-
-  function insertCheckbox() {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.focus();
-
-    // Build checkbox row with a real text node for reliable cursor placement
-    const row = document.createElement('div');
-    row.className = 'note-checkbox-row';
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.className = 'note-cb-input';
-    const sp = document.createElement('span');
-    sp.className = 'note-cb-text';
-    // Add zero-width space so mobile cursor lands here reliably
-    const tn = document.createTextNode('​');
-    sp.appendChild(tn);
-    row.appendChild(cb);
-    row.appendChild(document.createTextNode(' '));
-    row.appendChild(sp);
-
-    const sel = window.getSelection();
-    if (sel.rangeCount) {
-      const range = sel.getRangeAt(0);
-      let node = range.startContainer;
-      if (node.nodeType === 3) node = node.parentElement;
-      const block = node.closest('div, p, h1, h2, h3') || node;
-      if (block && block !== editor) {
-        block.insertAdjacentElement('afterend', row);
-      } else {
-        range.collapse(false);
-        range.insertNode(row);
-      }
-      // Place cursor after zero-width space
-      const newRange = document.createRange();
-      newRange.setStart(tn, 1);
-      newRange.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-      editor.focus();
-    }
-    contentRef.current = editor.innerHTML || '';
-    scheduleAutoSave(editTitle, editTag, editColor);
-  }
-
-  // ── Auto-continue lists on Enter ─────────────────────────────────────────
   function handleKeyDown(e) {
-    if (e.key !== 'Enter') return;
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return;
-    const node = sel.getRangeAt(0).startContainer;
-    const getEl = n => n.nodeType === 3 ? n.parentElement : n;
-
-    // ── Checkbox row ──
-    const row = getEl(node)?.closest('.note-checkbox-row');
-    if (row) {
-      e.preventDefault();
-      const span = row.querySelector('.note-cb-text');
-      if (!span?.textContent.trim()) {
-        const newDiv = document.createElement('div');
-        newDiv.innerHTML = '<br>';
-        row.replaceWith(newDiv);
-        const range = document.createRange();
-        range.setStart(newDiv, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-      } else {
-        const newRow = document.createElement('div');
-        newRow.className = 'note-checkbox-row';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.className = 'note-cb-input';
-        const sp = document.createElement('span');
-        sp.className = 'note-cb-text';
-        sp.setAttribute('contenteditable', 'true');
-        newRow.appendChild(cb);
-        newRow.appendChild(document.createTextNode(' '));
-        newRow.appendChild(sp);
-        row.insertAdjacentElement('afterend', newRow);
-        sp.focus();
-        const range = document.createRange();
-        range.selectNodeContents(sp);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
+    if (e.key === 'Enter') {
+      handleEnter(e);
+      if (!e.defaultPrevented) {
+        setTimeout(() => {
+          contentRef.current = editorRef.current?.innerHTML || '';
+          scheduleAutoSave(editTitle, editTag, editColor);
+        }, 0);
       }
-      contentRef.current = editorRef.current?.innerHTML || '';
-      scheduleAutoSave(editTitle, editTag, editColor);
-      return;
     }
-
-    // ── List row (ul/ol simulated with divs) ──
-    const listRow = getEl(node)?.closest('.note-ul-row, .note-ol-row');
-    if (listRow) {
-      e.preventDefault();
-      if (!listRow.textContent.trim()) {
-        // Empty row — exit list
-        const newDiv = document.createElement('div');
-        newDiv.innerHTML = '<br>';
-        listRow.replaceWith(newDiv);
-        const range = document.createRange();
-        range.setStart(newDiv, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-      } else {
-        // Continue list
-        const type = listRow.getAttribute('data-list-type');
-        const newRow = document.createElement('div');
-        newRow.className = listRow.className;
-        newRow.setAttribute('data-list-type', type);
-        if (type === 'ol') {
-          const num = parseInt(listRow.getAttribute('data-num') || '1') + 1;
-          newRow.setAttribute('data-num', num);
-          newRow.setAttribute('data-prefix', num + '. ');
-        } else {
-          newRow.setAttribute('data-prefix', '• ');
-        }
-        const textNode = document.createTextNode('');
-        newRow.appendChild(textNode);
-        listRow.insertAdjacentElement('afterend', newRow);
-        const range = document.createRange();
-        range.setStart(textNode, 0); range.collapse(true);
-        sel.removeAllRanges(); sel.addRange(range);
-      }
-      contentRef.current = editorRef.current?.innerHTML || '';
-      scheduleAutoSave(editTitle, editTag, editColor);
-      return;
-    }
-
-    // ── Default ──
-    setTimeout(() => {
-      contentRef.current = editorRef.current?.innerHTML || '';
-      scheduleAutoSave(editTitle, editTag, editColor);
-    }, 0);
   }
+
 
   function fmtDate(str) {
     if (!str) return '';
