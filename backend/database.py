@@ -84,6 +84,7 @@ async def init_db():
                 description      TEXT,
                 event_date       TEXT    NOT NULL,
                 event_time       TEXT,
+                end_time         TEXT,
                 reminder_minutes INTEGER DEFAULT 15,
                 reminded         INTEGER DEFAULT 0,
                 created_at       TEXT    DEFAULT (datetime('now')),
@@ -144,6 +145,12 @@ async def init_db():
         # Migration: add color column to notes if it doesn't exist
         try:
             await db.execute("ALTER TABLE notes ADD COLUMN color TEXT DEFAULT 'gold'")
+            await db.commit()
+        except Exception:
+            pass  # Column already exists
+        # Migration: add end_time column to events if it doesn't exist
+        try:
+            await db.execute("ALTER TABLE events ADD COLUMN end_time TEXT")
             await db.commit()
         except Exception:
             pass  # Column already exists
@@ -263,14 +270,15 @@ async def get_conversation_history(
 ) -> list:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            """SELECT role, content FROM conversations
+            """SELECT role, content, created_at FROM conversations
                WHERE user_id = ? AND mode = ?
                AND created_at >= datetime('now', '-48 hours')
                ORDER BY created_at DESC LIMIT ?""",
             (user_id, mode, limit)
         ) as c:
             rows = await c.fetchall()
-            return [{"role": r[0], "content": r[1]} for r in reversed(rows)]
+            # Reverse to get chronological order (oldest first, newest last)
+            return [{"role": r[0], "content": r[1], "created_at": r[2]} for r in reversed(rows)]
 
 
 # ── Memories ──────────────────────────────────────────────────────────────────
@@ -385,6 +393,15 @@ async def delete_task(task_id: int, user_id: int):
         await db.commit()
 
 
+async def update_task(task_id: int, user_id: int, title: str, reminder_at: str = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE tasks SET title = ?, reminder_at = ? WHERE id = ? AND user_id = ?",
+            (title, reminder_at, task_id, user_id)
+        )
+        await db.commit()
+
+
 async def get_task_reminders() -> list:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -410,18 +427,33 @@ async def clear_task_reminder(task_id: int):
 async def add_event(
     user_id: int, title: str, event_date: str,
     event_time: str = None, description: str = None,
-    reminder_minutes: int = 15
+    reminder_minutes: int = 15, end_time: str = None
 ) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
             """INSERT INTO events
-               (user_id, title, description, event_date, event_time, reminder_minutes)
-               VALUES (?, ?, ?, ?, ?, ?) RETURNING id""",
-            (user_id, title, description, event_date, event_time, reminder_minutes)
+               (user_id, title, description, event_date, event_time, end_time, reminder_minutes)
+               VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id""",
+            (user_id, title, description, event_date, event_time, end_time, reminder_minutes)
         ) as c:
             row = await c.fetchone()
             await db.commit()
             return row[0] if row else None
+
+
+async def update_event(
+    event_id: int, user_id: int, title: str, event_date: str,
+    event_time: str = None, end_time: str = None,
+    description: str = None, reminder_minutes: int = 15
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """UPDATE events SET title=?, event_date=?, event_time=?, end_time=?,
+               description=?, reminder_minutes=?, reminded=0
+               WHERE id=? AND user_id=?""",
+            (title, event_date, event_time, end_time, description, reminder_minutes, event_id, user_id)
+        )
+        await db.commit()
 
 
 async def get_events(user_id: int, date: str = None) -> list:
@@ -695,7 +727,7 @@ async def cleanup_old_data():
         await db.execute("""
             DELETE FROM tasks
             WHERE done = 1
-            AND datetime(created_at, '+24 hours') < datetime('now')
+            AND datetime(created_at, '+3 days') < datetime('now')
         """)
         await db.execute("""
             UPDATE tasks SET reminder_at = NULL

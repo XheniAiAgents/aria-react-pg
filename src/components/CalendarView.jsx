@@ -11,6 +11,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   const [selectedDate, setSelectedDate] = useState(now.toISOString().split('T')[0]);
   const [calEvents, setCalEvents] = useState({});
   const [modalOpen, setModalOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState(null);
   const todayStr = now.toISOString().split('T')[0];
 
   const loadEvents = useCallback(async () => {
@@ -42,6 +43,31 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     onEventsChanged && onEventsChanged();
   }
 
+  function openEditModal(e) {
+    setEditEvent(e);
+    setModalOpen(true);
+  }
+
+  function openAddModal() {
+    setEditEvent(null);
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditEvent(null);
+  }
+
+  async function handleAdded() {
+    await loadEvents();
+    onEventsChanged && onEventsChanged();
+  }
+
+  async function handleEdited() {
+    await loadEvents();
+    onEventsChanged && onEventsChanged();
+  }
+
   // Build grid
   const firstDay = new Date(year, month, 1);
   let startDow = firstDay.getDay();
@@ -60,6 +86,28 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   const noEventsLabel = t ? t('noEvents') : 'No events.';
   const noUpcomingLabel = t ? t('noUpcoming') : 'No upcoming events.';
 
+  function formatTimeRange(e) {
+    if (!e.event_time) return '—';
+    if (e.end_time) return `${e.event_time} – ${e.end_time}`;
+    return e.event_time;
+  }
+
+  function renderEventItem(e, dateLabel) {
+    return (
+      <div key={e.id} className="event-item" style={{ cursor: 'pointer' }} onClick={() => openEditModal(e)}>
+        <div className="event-time" style={dateLabel ? { minWidth: '60px', fontSize: '9px' } : {}}>
+          {dateLabel && <div style={{ color: 'var(--a2)' }}>{dateLabel}</div>}
+          <div>{formatTimeRange(e)}</div>
+        </div>
+        <div className="event-body">
+          <div className="event-title-text">{e.title}</div>
+          {e.description && <div className="event-desc">{e.description}</div>}
+        </div>
+        <button className="event-del" onClick={ev => { ev.stopPropagation(); deleteEvent(e.id); }}>delete</button>
+      </div>
+    );
+  }
+
   return (
     <div id="calView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflowY: 'auto', padding: '24px 32px' }}>
       {/* Header */}
@@ -70,7 +118,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           <span className="cal-month-label">{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         </div>
-        <button className="add-btn" onClick={() => setModalOpen(true)}>
+        <button className="add-btn" onClick={openAddModal}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
@@ -114,16 +162,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
         </div>
         {!dayEvents.length
           ? <div className="no-events">{noEventsLabel}</div>
-          : dayEvents.map(e => (
-            <div key={e.id} className="event-item">
-              <div className="event-time">{e.event_time || '—'}</div>
-              <div className="event-body">
-                <div className="event-title-text">{e.title}</div>
-                {e.description && <div className="event-desc">{e.description}</div>}
-              </div>
-              <button className="event-del" onClick={() => deleteEvent(e.id)}>delete</button>
-            </div>
-          ))}
+          : dayEvents.map(e => renderEventItem(e, null))}
       </div>
 
       {/* Upcoming */}
@@ -133,30 +172,20 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
         </div>
         {!upcoming.length
           ? <div className="no-events">{noUpcomingLabel}</div>
-          : upcoming.slice(0, 6).map((e, i) => {
+          : upcoming.slice(0, 6).map((e) => {
             const isToday = e.dateStr === todayStr;
             const dateLabel = isToday ? todayLabel
               : new Date(e.dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-            return (
-              <div key={i} className="event-item">
-                <div className="event-time" style={{ minWidth: '60px', fontSize: '9px' }}>
-                  <div style={{ color: 'var(--a2)' }}>{dateLabel}</div>
-                  <div>{e.event_time || '—'}</div>
-                </div>
-                <div className="event-body">
-                  <div className="event-title-text">{e.title}</div>
-                  {e.description && <div className="event-desc">{e.description}</div>}
-                </div>
-                <button className="event-del" onClick={() => deleteEvent(e.id)}>delete</button>
-              </div>
-            );
+            return renderEventItem(e, dateLabel);
           })}
       </div>
 
       <EventModal
         API={API} userId={userId} selectedDate={selectedDate}
-        open={modalOpen} onClose={() => setModalOpen(false)}
-        onAdded={async () => { await loadEvents(); onEventsChanged && onEventsChanged(); }}
+        open={modalOpen} onClose={closeModal}
+        editEvent={editEvent}
+        onAdded={handleAdded}
+        onEdited={handleEdited}
         showToast={showToast}
       />
     </div>

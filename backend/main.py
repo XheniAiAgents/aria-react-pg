@@ -30,8 +30,8 @@ from backend.database import (
     get_or_create_user, get_all_users, get_user_by_id,
     register_user, login_user,
     get_memories, delete_memory,
-    get_tasks, add_task, complete_task, delete_task,
-    get_events, get_events_month, add_event, delete_event,
+    get_tasks, add_task, complete_task, delete_task, update_task,
+    get_events, get_events_month, add_event, delete_event, update_event,
     get_pending_reminders, mark_reminder_sent,
     get_task_reminders, clear_task_reminder,
     create_link_code, verify_link_code,
@@ -169,6 +169,7 @@ class ChatRequest(BaseModel):
     user_id: int
     mode: str = "work"
     lang: str = "en"
+    user_local_time: str = None  # ISO string from browser e.g. "2026-03-20T17:25:00"
 
 class RegisterRequest(BaseModel):
     name: str
@@ -188,11 +189,25 @@ class TaskCreate(BaseModel):
     title: str
     reminder_at: Optional[str] = None
 
+class TaskUpdate(BaseModel):
+    user_id: int
+    title: str
+    reminder_at: Optional[str] = None
+
 class EventCreate(BaseModel):
     user_id: int
     title: str
     event_date: str
     event_time: Optional[str] = None
+    description: Optional[str] = None
+    reminder_minutes: int = 15
+
+class EventUpdate(BaseModel):
+    user_id: int
+    title: str
+    event_date: str
+    event_time: Optional[str] = None
+    end_time: Optional[str] = None
     description: Optional[str] = None
     reminder_minutes: int = 15
 
@@ -349,7 +364,7 @@ async def chat_endpoint(req: ChatRequest, request: Request):
     if not req.message.strip():
         raise HTTPException(400, "Empty message")
     try:
-        response = await chat(req.user_id, req.message, req.mode, req.lang)
+        response = await chat(req.user_id, req.message, req.mode, req.lang, req.user_local_time)
         return {"response": response, "mode": req.mode}
     except Exception as e:
         import traceback
@@ -396,6 +411,12 @@ async def delete_task_endpoint(task_id: int, user_id: int):
     return {"status": "deleted"}
 
 
+@app.put("/tasks/{task_id}")
+async def update_task_endpoint(task_id: int, req: TaskUpdate):
+    await update_task(task_id, req.user_id, req.title, req.reminder_at)
+    return {"status": "updated"}
+
+
 # ── Events ────────────────────────────────────────────────────────────────────
 
 @app.get("/events/{user_id}")
@@ -412,7 +433,8 @@ async def get_events_month_endpoint(user_id: int, year: int, month: int):
 async def create_event(req: EventCreate):
     event_id = await add_event(
         req.user_id, req.title, req.event_date,
-        req.event_time, req.description, req.reminder_minutes
+        req.event_time, req.description, req.reminder_minutes,
+        getattr(req, 'end_time', None)
     )
     return {"event_id": event_id}
 
@@ -421,6 +443,13 @@ async def create_event(req: EventCreate):
 async def delete_event_endpoint(event_id: int, user_id: int):
     await delete_event(event_id, user_id)
     return {"status": "deleted"}
+
+
+@app.put("/events/{event_id}")
+async def update_event_endpoint(event_id: int, req: EventUpdate):
+    await update_event(event_id, req.user_id, req.title, req.event_date,
+                       req.event_time, req.end_time, req.description, req.reminder_minutes)
+    return {"status": "updated"}
 
 
 # ── Google OAuth / Gmail ──────────────────────────────────────────────────────

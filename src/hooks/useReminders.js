@@ -57,6 +57,10 @@ export function useReminders(API, userId, onFire) {
         if (reminderDt <= now && reminderDt > new Date(now.getTime() - windowMs)) {
           notifiedTasks.current.add(t.id);
           fireReminder('📌', 'Task reminder', t.title);
+          // Auto-mark as completed so it doesn't fire again
+          try {
+            await fetch(`${API}/tasks/${t.id}/complete?user_id=${userId}`, { method: 'POST' });
+          } catch {}
         }
       }
     } catch {}

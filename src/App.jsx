@@ -9,7 +9,8 @@ import { useLanguage } from './hooks/useLanguage';
 import './App.css';
 
 // Auto-detects: localhost in dev, Railway domain in production
-const API = window.location.origin;
+// const API = window.location.origin;
+const API = import.meta.env.VITE_API_URL || window.location.origin;
 
 export default function App() {
   const [userId, setUserId] = useState(null);

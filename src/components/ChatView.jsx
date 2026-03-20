@@ -15,7 +15,15 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     setTimeout(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, 50);
   }, []);
 
-  useEffect(() => { scrollDown(); }, [messages, scrollDown]);
+  const isFirstLoad = useRef(true);
+
+  useEffect(() => { 
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    scrollDown(); 
+  }, [messages, scrollDown]);
 
   // Load history or show welcome message
   useEffect(() => {
@@ -35,12 +43,10 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
     function isNewSession(lastMsgDate) {
       if (!lastMsgDate) return true;
-      const last = new Date(lastMsgDate);
+      const last = new Date(lastMsgDate.replace(' ', 'T'));
       const now = new Date();
-      // New session if: different day AND current time is after 7:00am
       const differentDay = last.toDateString() !== now.toDateString();
       const afterSevenAm = now.getHours() >= 7;
-      // Or more than 8 hours have passed
       const hoursElapsed = (now - last) / (1000 * 60 * 60);
       return (differentDay && afterSevenAm) || hoursElapsed >= 8;
     }
@@ -54,23 +60,20 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
             const loaded = history.map(m => ({
               type: m.role === 'user' ? 'user' : 'aria',
               text: m.content,
-              time: new Date(m.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+              time: new Date(m.created_at.replace(' ', 'T')).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
               created_at: m.created_at
             }));
-            // Check if we should show welcome message
             const lastMsg = history[history.length - 1];
             if (isNewSession(lastMsg?.created_at)) {
-              // New session — show welcome then history
-              setMessages([getWelcome(), ...loaded]);
+              setMessages([...loaded, getWelcome()]);
             } else {
-              // Same session — just show history
               setMessages(loaded);
+              scrollDown();
             }
             return;
           }
         }
       } catch {}
-      // No history — show welcome message
       setMessages([getWelcome()]);
     }
 
@@ -104,7 +107,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     } else {
       setAttachedFile({ file, preview: null, type: 'document' });
     }
-    // Reset input so same file can be selected again
     e.target.value = '';
   }
 
@@ -120,7 +122,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     setAttachedFile(null);
     setIsThinking(true);
 
-    // Add user message to UI
     setMessages(msgs => [...msgs, {
       type: 'user',
       text: text || (currentFile ? `[${currentFile.file.name}]` : ''),
@@ -132,7 +133,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       let response;
 
       if (currentFile) {
-        // Send as multipart form with file
         const formData = new FormData();
         formData.append('user_id', userId);
         formData.append('mode', mode);
@@ -143,11 +143,13 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
         const data = await res.json();
         response = data.response;
       } else {
-        // Normal text chat
+        // Build local time string from browser (not UTC)
+        const d = new Date();
+        const localTime = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:00`;
         const data = await (await fetch(`${API}/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, user_id: userId, mode, lang })
+          body: JSON.stringify({ message: text, user_id: userId, mode, lang, user_local_time: localTime })
         })).json();
         response = data.response;
       }
@@ -217,7 +219,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       <div className="input-zone">
         <div className="input-shimmer" />
 
-        {/* File attachment preview */}
         {attachedFile && (
           <div className="file-preview-bar">
             {attachedFile.preview
@@ -229,7 +230,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
         )}
 
         <div className="input-row">
-          {/* File attach button */}
           <button
             className="attach-btn"
             onClick={() => fileInputRef.current?.click()}

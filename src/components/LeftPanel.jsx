@@ -71,7 +71,7 @@ export default function LeftPanel({ API, userId, userName, mode, onModeChange, o
         <div className="ctx-label">{t('ariaKnows')}</div>
         {!memories.length ? (
           <div style={{ fontSize: '11px', color: 'var(--ghost)', fontStyle: 'italic' }}>{t('startChatting')}</div>
-        ) : memories.map(m => (
+        ) : memories.filter(m => !m.content.startsWith('[CONVERSATION SUMMARY]')).map(m => (
           <div key={m.id} className={`know-card ${m.importance}`}>
             <div className="know-text">{m.content}</div>
             <div className="know-foot">

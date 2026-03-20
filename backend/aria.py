@@ -11,7 +11,7 @@ from backend.database import (
     save_message, get_conversation_history,
     save_memory, get_memories,
     add_task, get_tasks, complete_task, delete_task,
-    add_event, get_events, delete_event,
+    add_event, get_events, delete_event, update_event,
     get_google_token
 )
 
@@ -47,7 +47,8 @@ GMAIL STATUS: {gmail}
 INTERNAL COMMANDS - include ONLY when genuinely needed, as raw JSON on its own line, nothing else around it:
 {{"action": "save_memory", "content": "...", "importance": "high|medium|low"}}
 {{"action": "add_task", "title": "specific meaningful title", "reminder_at": "YYYY-MM-DD HH:MM or null"}}
-{{"action": "add_event", "title": "...", "event_date": "YYYY-MM-DD", "event_time": "HH:MM", "description": "optional", "reminder_minutes": 15}}
+{{"action": "add_event", "title": "...", "event_date": "YYYY-MM-DD", "event_time": "HH:MM", "end_time": "HH:MM or null", "description": "optional", "reminder_minutes": 15}}
+{{"action": "edit_event", "event_id": <id>, "title": "...", "event_date": "YYYY-MM-DD", "event_time": "HH:MM", "end_time": "HH:MM or null", "description": "optional", "reminder_minutes": 15}}
 {{"action": "delete_task", "task_id": <id>}}
 {{"action": "delete_event", "event_id": <id>}}
 {{"action": "complete_task", "task_id": <id>}}
@@ -109,7 +110,8 @@ GMAIL STATUS: {gmail}
 INTERNAL COMMANDS - include ONLY when genuinely needed, as raw JSON on its own line:
 {{"action": "save_memory", "content": "...", "importance": "high|medium|low"}}
 {{"action": "add_task", "title": "specific meaningful title", "reminder_at": "YYYY-MM-DD HH:MM or null"}}
-{{"action": "add_event", "title": "...", "event_date": "YYYY-MM-DD", "event_time": "HH:MM", "description": "optional", "reminder_minutes": 15}}
+{{"action": "add_event", "title": "...", "event_date": "YYYY-MM-DD", "event_time": "HH:MM", "end_time": "HH:MM or null", "description": "optional", "reminder_minutes": 15}}
+{{"action": "edit_event", "event_id": <id>, "title": "...", "event_date": "YYYY-MM-DD", "event_time": "HH:MM", "end_time": "HH:MM or null", "description": "optional", "reminder_minutes": 15}}
 {{"action": "delete_task", "task_id": <id>}}
 {{"action": "delete_event", "event_id": <id>}}
 {{"action": "complete_task", "task_id": <id>}}
@@ -139,7 +141,7 @@ RULES - non negotiable:
 - Sound like a person, not a system."""
 
 
-async def build_system_prompt(user_id: int, mode: str = "work", lang: str = "en") -> str:
+async def build_system_prompt(user_id: int, mode: str = "work", lang: str = "en", user_local_time: str = None) -> str:
     memories = await get_memories(user_id)
     tasks = await get_tasks(user_id)
     events = await get_events(user_id)
@@ -165,9 +167,20 @@ async def build_system_prompt(user_id: int, mode: str = "work", lang: str = "en"
     except Exception:
         gmail_text = "Not connected"
 
+    # Use browser local time if provided, fallback to server time
+    if user_local_time:
+        try:
+            from datetime import datetime as dt
+            local_dt = dt.fromisoformat(user_local_time[:16])  # "YYYY-MM-DDTHH:MM"
+            today_str = local_dt.strftime("%A, %d %B %Y — %H:%M")
+        except Exception:
+            today_str = datetime.now().strftime("%A, %d %B %Y — %H:%M")
+    else:
+        today_str = datetime.now().strftime("%A, %d %B %Y — %H:%M")
+
     template = WORK_PROMPT if mode == "work" else LIFE_PROMPT
     return template.format(
-        today=datetime.now().strftime("%A, %d %B %Y — %H:%M"),
+        today=today_str,
         memories=memory_text,
         tasks=task_text,
         events=event_text,
@@ -224,7 +237,15 @@ async def extract_and_execute_commands(text: str, user_id: int) -> str:
                     await add_task(user_id, title, cmd.get("reminder_at"))
             elif action == "add_event":
                 await add_event(user_id, cmd.get("title", ""), cmd.get("event_date", ""),
-                                cmd.get("event_time"), cmd.get("description"), cmd.get("reminder_minutes", 15))
+                                cmd.get("event_time"), cmd.get("description"), cmd.get("reminder_minutes", 15),
+                                cmd.get("end_time"))
+            elif action == "edit_event":
+                event_id = cmd.get("event_id")
+                if event_id:
+                    await update_event(int(event_id), user_id, cmd.get("title", ""),
+                                       cmd.get("event_date", ""), cmd.get("event_time"),
+                                       cmd.get("end_time"), cmd.get("description"),
+                                       cmd.get("reminder_minutes", 15))
             elif action == "delete_task":
                 task_id = cmd.get("task_id")
                 if task_id:
@@ -300,7 +321,7 @@ Be brief and factual. Max 150 words. Format as bullet points."""
         return None
 
 
-async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = "en") -> str:
+async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = "en", user_local_time: str = None) -> str:
     await save_message(user_id, "user", user_message, mode)
 
     history = await get_conversation_history(user_id, mode=mode, limit=40)
@@ -311,7 +332,7 @@ async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = 
         # After summarizing, use only recent messages
         history = await get_conversation_history(user_id, mode=mode, limit=15)
 
-    system = await build_system_prompt(user_id, mode, lang)
+    system = await build_system_prompt(user_id, mode, lang, user_local_time)
 
     # Convert history to Anthropic format
     messages = []
