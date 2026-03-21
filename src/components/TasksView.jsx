@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { fmtDatetime } from '../utils/helpers';
 
+// Convert datetime-local value (local time) to UTC ISO string for backend
+function toUTC(localDatetime) {
+  if (!localDatetime) return null;
+  return new Date(localDatetime).toISOString();
+}
+
 export default function TasksView({ API, userId, visible, showToast, t }) {
   const [pending, setPending] = useState([]);
   const [completed, setCompleted] = useState([]);
@@ -37,7 +43,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
     try {
       const res = await fetch(`${API}/tasks`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: newTitle, reminder_at: newReminder || null })
+        body: JSON.stringify({ user_id: userId, title: newTitle, reminder_at: toUTC(newReminder) })
       });
       if (!res.ok) { const e = await res.json(); throw new Error(JSON.stringify(e)); }
       setNewTitle(''); setNewReminder(''); setAddOpen(false);
@@ -74,7 +80,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
     try {
       await fetch(`${API}/tasks/${editId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: editTitle, reminder_at: editReminder || null })
+        body: JSON.stringify({ user_id: userId, title: editTitle, reminder_at: toUTC(editReminder) })
       });
       cancelEdit();
       await loadTasks();
