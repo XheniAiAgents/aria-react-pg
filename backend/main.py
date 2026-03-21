@@ -73,6 +73,8 @@ async def send_web_push(subscription: dict, title: str, body: str):
         vapid_email   = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:aria@example.com")
         if not vapid_private:
             return
+        endpoint_short = subscription["endpoint"][:60]
+        print(f"[push] sending to {endpoint_short}...")
         webpush(
             subscription_info={
                 "endpoint": subscription["endpoint"],
@@ -85,13 +87,14 @@ async def send_web_push(subscription: dict, title: str, body: str):
             vapid_private_key=vapid_private,
             vapid_claims={"sub": vapid_email},
         )
+        print(f"[push] sent OK to {endpoint_short}")
     except Exception as wp_err:
         err_str = str(wp_err)
+        endpoint = subscription.get("endpoint", "")[:60]
+        print(f"[push] ERROR for {endpoint}: {wp_err}")
         # 404/410 means the subscription is gone — clean it up
         if "404" in err_str or "410" in err_str:
             await delete_push_subscription(subscription["endpoint"])
-        else:
-            print(f"[push] Error: {wp_err}")
 
 
 async def reminder_loop():
