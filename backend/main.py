@@ -104,9 +104,9 @@ async def reminder_loop():
         try:
             pending_events = await get_pending_reminders()
             pending_tasks  = await get_task_reminders()
-            print(f"[reminder] pending_events={len(pending_events)} pending_tasks={len(pending_tasks)}")
+            print(f"[reminder] tick: events={len(pending_events)} tasks={len(pending_tasks)}")
 
-            # Collect all unique user IDs that need push too
+            # Collect push subscriptions for all affected users
             push_user_ids = list({e["user_id"] for e in pending_events} |
                                   {t["user_id"] for t in pending_tasks})
             push_subs_by_user: dict[int, list] = {}
@@ -115,13 +115,12 @@ async def reminder_loop():
                 print(f"[reminder] user_ids={push_user_ids} push_subs={len(all_subs)}")
                 for sub in all_subs:
                     push_subs_by_user.setdefault(sub["user_id"], []).append(sub)
-                print(f"[reminder] push_user_ids={push_user_ids} subs_found={len(all_subs)}")
 
             for event in pending_events:
                 title    = f"⏰ {event['title']}"
-                print(f"[reminder] firing event '{event['title']}' user_id={event['user_id']}")
                 time_str = event.get("event_time", "")
                 body     = f"Starting at {time_str}" if time_str else "Your event is starting soon"
+                print(f"[reminder] event '{event['title']}' user={event['user_id']}")
                 # Telegram
                 tid = event.get("telegram_id")
                 if bot and tid:
@@ -131,23 +130,25 @@ async def reminder_loop():
                     msg += "\n\n— ARIA"
                     await bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
                 # Web Push
-                for sub in push_subs_by_user.get(event["user_id"], []):
-                subs_e = push_subs_by_user.get(event["user_id"], [])
-                print(f"[reminder] web push to {len(subs_e)} sub(s) for event")
+                subs = push_subs_by_user.get(event["user_id"], [])
+                print(f"[reminder] sending to {len(subs)} push sub(s)")
+                for sub in subs:
                     await send_web_push(sub, title, body)
                 await mark_reminder_sent(event["id"])
 
             for task in pending_tasks:
                 title = f"📌 {task['title']}"
-                print(f"[reminder] firing task '{task['title']}' user_id={task['user_id']}")
                 body  = "Task reminder from ARIA"
+                print(f"[reminder] task '{task['title']}' user={task['user_id']}")
                 # Telegram
                 tid = task.get("telegram_id")
                 if bot and tid:
                     msg = f"📌 Task reminder: *{task['title']}*\n\n— ARIA"
                     await bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
                 # Web Push
-                for sub in push_subs_by_user.get(task["user_id"], []):
+                subs = push_subs_by_user.get(task["user_id"], [])
+                print(f"[reminder] sending to {len(subs)} push sub(s)")
+                for sub in subs:
                     await send_web_push(sub, title, body)
                 await clear_task_reminder(task["id"])
 
