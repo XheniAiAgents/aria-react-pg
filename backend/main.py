@@ -99,10 +99,12 @@ async def reminder_loop():
     import telegram
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     bot = telegram.Bot(token) if token else None
+    print("[reminder] loop started")
     while True:
         try:
             pending_events = await get_pending_reminders()
             pending_tasks  = await get_task_reminders()
+            print(f"[reminder] pending_events={len(pending_events)} pending_tasks={len(pending_tasks)}")
 
             # Collect all unique user IDs that need push too
             push_user_ids = list({e["user_id"] for e in pending_events} |
@@ -110,11 +112,14 @@ async def reminder_loop():
             push_subs_by_user: dict[int, list] = {}
             if push_user_ids:
                 all_subs = await get_all_push_subscriptions_for_users(push_user_ids)
+                print(f"[reminder] user_ids={push_user_ids} push_subs={len(all_subs)}")
                 for sub in all_subs:
                     push_subs_by_user.setdefault(sub["user_id"], []).append(sub)
+                print(f"[reminder] push_user_ids={push_user_ids} subs_found={len(all_subs)}")
 
             for event in pending_events:
                 title    = f"⏰ {event['title']}"
+                print(f"[reminder] firing event '{event['title']}' user_id={event['user_id']}")
                 time_str = event.get("event_time", "")
                 body     = f"Starting at {time_str}" if time_str else "Your event is starting soon"
                 # Telegram
@@ -127,11 +132,14 @@ async def reminder_loop():
                     await bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
                 # Web Push
                 for sub in push_subs_by_user.get(event["user_id"], []):
+                subs_e = push_subs_by_user.get(event["user_id"], [])
+                print(f"[reminder] web push to {len(subs_e)} sub(s) for event")
                     await send_web_push(sub, title, body)
                 await mark_reminder_sent(event["id"])
 
             for task in pending_tasks:
                 title = f"📌 {task['title']}"
+                print(f"[reminder] firing task '{task['title']}' user_id={task['user_id']}")
                 body  = "Task reminder from ARIA"
                 # Telegram
                 tid = task.get("telegram_id")
