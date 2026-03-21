@@ -10,6 +10,7 @@ export default function SettingsPanel({
   digestTime, digestEnabled,
   onDigestTimeChange, onDigestEnabledToggle,
   onSaveDigest, onTestDigest, onConnectGmail, onDisconnectGmail,
+  calendarConnected, calendarEmail, onConnectCalendar, onDisconnectCalendar,
   lang, onSetLang,
   isMobile = false, t
 }) {
@@ -85,6 +86,25 @@ export default function SettingsPanel({
             <button className="settings-item danger" style={{ padding: '6px 8px', fontSize: '10px', justifyContent: 'center', marginTop: '4px' }} onClick={onDisconnectGmail}>Disconnect Gmail</button>
           </div>
         </>
+      )}
+
+      {/* Google Calendar */}
+      <div className="settings-divider" />
+      <div className="settings-section-label">Google Calendar</div>
+      {!calendarConnected ? (
+        <button className="settings-item" onClick={onConnectCalendar}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Connect Google Calendar
+        </button>
+      ) : (
+        <div style={{ padding: '4px 12px 8px' }}>
+          <div className="digest-status connected" style={{ marginBottom: '6px' }}>✓ {calendarEmail}</div>
+          <div style={{ fontSize: '10px', color: 'var(--ghost)', fontStyle: 'italic', marginBottom: '8px' }}>
+            Syncs automatically when you open Calendar
+          </div>
+          <button className="settings-item danger" style={{ padding: '6px 8px', fontSize: '10px', justifyContent: 'center' }}
+            onClick={onDisconnectCalendar}>Disconnect Calendar</button>
+        </div>
       )}
 
       {/* Language selector */}

@@ -1,4 +1,4 @@
-import anthropic
+from groq import Groq
 import json
 import re
 import os
@@ -16,10 +16,10 @@ from backend.database import (
 )
 
 def get_client():
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY environment variable is not set")
-    return anthropic.Anthropic(api_key=api_key)
+        raise ValueError("GROQ_API_KEY environment variable is not set")
+    return Groq(api_key=api_key)
 
 
 WORK_PROMPT = """You are ARIA in WORK MODE — sharp, focused, professional. A trusted personal assistant.
@@ -191,8 +191,8 @@ async def build_system_prompt(user_id: int, mode: str = "work", lang: str = "en"
 def clean_response(text: str) -> str:
     text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
     text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
-    text = re.sub(r'^\s*\{["\'"]action["\'"].*?\}\s*$', '', text, flags=re.MULTILINE)
-    text = re.sub(r'\[?\s*\{["\'"]action["\'"].*?\}\s*\]?', '', text, flags=re.DOTALL)
+    text = re.sub(r'^\s*\{["\']action["\'].*?\}\s*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\[?\s*\{["\']action["\'].*?\}\s*\]?', '', text, flags=re.DOTALL)
     phrases = [
         r'Voy a guardar[^.]*\.', r'He guardado[^.]*\.', r'Voy a añadir[^.]*\.',
         r'He añadido[^.]*\.', r"I'll save[^.]*\.", r"I've saved[^.]*\.",
@@ -291,7 +291,6 @@ async def maybe_summarize_history(user_id: int, mode: str, history: list) -> str
     if len(history) < 30:
         return None
 
-    # Summarize oldest 20 messages
     to_summarize = history[:20]
     summary_prompt = """Read this conversation excerpt and extract a concise summary of:
 1. Key personal information shared (job, projects, goals, relationships, health, life events)
@@ -306,15 +305,14 @@ Be brief and factual. Max 150 words. Format as bullet points."""
 
     try:
         client = get_client()
-        response = client.messages.create(
-            model="claude-haiku-4-5",
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
             max_tokens=300,
             messages=[
                 {"role": "user", "content": f"{summary_prompt}\n\n---\n{messages_text}"}
             ]
         )
-        summary = response.content[0].text
-        # Save summary as high importance memory
+        summary = response.choices[0].message.content
         await save_memory(user_id, f"[CONVERSATION SUMMARY] {summary}", "high")
         return summary
     except Exception:
@@ -326,28 +324,28 @@ async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = 
 
     history = await get_conversation_history(user_id, mode=mode, limit=40)
 
-    # Auto-summarize if conversation is getting long
     if len(history) >= 30:
         await maybe_summarize_history(user_id, mode, history)
-        # After summarizing, use only recent messages
         history = await get_conversation_history(user_id, mode=mode, limit=15)
 
     system = await build_system_prompt(user_id, mode, lang, user_local_time)
 
-    # Convert history to Anthropic format
     messages = []
     for h in history:
         messages.append({"role": h["role"], "content": h["content"]})
 
     client = get_client()
-    response = client.messages.create(
-        model="claude-haiku-4-5",
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
         max_tokens=1024,
-        system=system,
-        messages=messages + [{"role": "user", "content": user_message}]
+        messages=[
+            {"role": "system", "content": system},
+            *messages,
+            {"role": "user", "content": user_message}
+        ]
     )
 
-    raw = response.content[0].text
+    raw = response.choices[0].message.content
     clean = await extract_and_execute_commands(raw, user_id)
 
     # Handle email summary result
@@ -360,13 +358,15 @@ async def chat(user_id: int, user_message: str, mode: str = "work", lang: str = 
                 {"role": "assistant", "content": raw},
                 {"role": "user", "content": f"[SYSTEM: Email fetch complete. Share this summary naturally with the user:]\n{email_summary}"}
             ]
-            followup = get_client().messages.create(
-                model="claude-haiku-4-5",
+            followup = get_client().chat.completions.create(
+                model="llama-3.3-70b-versatile",
                 max_tokens=1024,
-                system=system,
-                messages=followup_messages
+                messages=[
+                    {"role": "system", "content": system},
+                    *followup_messages
+                ]
             )
-            clean = clean_response(followup.content[0].text)
+            clean = clean_response(followup.choices[0].message.content)
 
     if not clean:
         clean = "Done."

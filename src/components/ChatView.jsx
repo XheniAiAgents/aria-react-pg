@@ -20,6 +20,8 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   useEffect(() => { 
     if (isFirstLoad.current) {
       isFirstLoad.current = false;
+      // Still scroll to bottom on first load so user sees latest messages
+      setTimeout(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, 100);
       return;
     }
     scrollDown(); 
@@ -43,7 +45,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
     function isNewSession(lastMsgDate) {
       if (!lastMsgDate) return true;
-      const last = new Date(lastMsgDate.replace(' ', 'T'));
+      const last = new Date(lastMsgDate.replace(' ', 'T').replace('+00', 'Z'));
       const now = new Date();
       const differentDay = last.toDateString() !== now.toDateString();
       const afterSevenAm = now.getHours() >= 7;
@@ -60,7 +62,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
             const loaded = history.map(m => ({
               type: m.role === 'user' ? 'user' : 'aria',
               text: m.content,
-              time: new Date(m.created_at.replace(' ', 'T')).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+              time: new Date(m.created_at.replace(' ', 'T').replace('+00', 'Z')).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
               created_at: m.created_at
             }));
             const lastMsg = history[history.length - 1];

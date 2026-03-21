@@ -4,7 +4,7 @@ import EventModal from './EventModal';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOWS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-export default function CalendarView({ API, userId, visible, showToast, onEventsChanged, t }) {
+export default function CalendarView({ API, userId, visible, showToast, onEventsChanged, t, googleConnected }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -12,6 +12,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   const [calEvents, setCalEvents] = useState({});
   const [modalOpen, setModalOpen] = useState(false);
   const [editEvent, setEditEvent] = useState(null);
+  const [syncing, setSyncing] = useState(false);
   const todayStr = now.toISOString().split('T')[0];
 
   const loadEvents = useCallback(async () => {
@@ -26,7 +27,36 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     } catch {}
   }, [API, userId, year, month]);
 
-  useEffect(() => { if (visible) loadEvents(); }, [visible, loadEvents]);
+  const syncGoogleCalendar = useCallback(async (silent = false) => {
+    if (!googleConnected) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(`${API}/calendar/sync/${userId}`, { method: 'POST' });
+      const data = await res.json();
+      if (!silent) {
+        if (data.synced !== undefined) showToast(`Synced ${data.synced} events from Google Calendar`);
+        else showToast('Sync failed', true);
+      }
+      await loadEvents();
+      onEventsChanged && onEventsChanged();
+    } catch {
+      if (!silent) showToast('Sync failed', true);
+    } finally {
+      setSyncing(false);
+    }
+  }, [API, userId, googleConnected, loadEvents, onEventsChanged, showToast]);
+
+  useEffect(() => {
+    if (visible) {
+      loadEvents();
+      // Auto-sync silently when calendar opens
+      if (googleConnected) syncGoogleCalendar(true);
+    }
+  }, [visible, loadEvents, googleConnected, syncGoogleCalendar]);
+
+  useEffect(() => {
+    if (visible) loadEvents();
+  }, [year, month]);
 
   function prevMonth() {
     if (month === 0) { setMonth(11); setYear(y => y - 1); }
@@ -100,7 +130,10 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           <div>{formatTimeRange(e)}</div>
         </div>
         <div className="event-body">
-          <div className="event-title-text">{e.title}</div>
+          <div className="event-title-text">
+            {e.google_id && <span style={{ marginRight: '4px', fontSize: '10px' }}>📅</span>}
+            {e.title}
+          </div>
           {e.description && <div className="event-desc">{e.description}</div>}
         </div>
         <button className="event-del" onClick={ev => { ev.stopPropagation(); deleteEvent(e.id); }}>delete</button>
@@ -118,12 +151,20 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           <span className="cal-month-label">{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         </div>
-        <button className="add-btn" onClick={openAddModal}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          {addEventLabel}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {googleConnected && (
+            <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
+              style={{ opacity: syncing ? 0.6 : 1 }}>
+              {syncing ? '⟳' : '🔄'} Sync
+            </button>
+          )}
+          <button className="add-btn" onClick={openAddModal}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            {addEventLabel}
+          </button>
+        </div>
       </div>
 
       {/* Grid */}
@@ -179,6 +220,13 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
             return renderEventItem(e, dateLabel);
           })}
       </div>
+
+      {/* Google Calendar hint */}
+      {!googleConnected && (
+        <div style={{ marginTop: '16px', fontSize: '11px', color: 'var(--ghost)', textAlign: 'center', fontStyle: 'italic' }}>
+          Connect Google Calendar in Settings to sync your events
+        </div>
+      )}
 
       <EventModal
         API={API} userId={userId} selectedDate={selectedDate}

@@ -12,6 +12,7 @@ import MobileHeader from './MobileHeader';
 import MobileNav from './MobileNav';
 import { useReminders } from '../hooks/useReminders';
 import { useGmail } from '../hooks/useGmail';
+import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 
 export default function AppShell({
   API, userId, userName, userEmail,
@@ -46,9 +47,11 @@ export default function AppShell({
   }, []);
 
   const gmail = useGmail(API, userId, showToast);
+  const gcal = useGoogleCalendar(API, userId, showToast);
 
   useEffect(() => {
     gmail.loadEmailAccount();
+    gcal.loadCalendarStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,6 +132,10 @@ export default function AppShell({
     onTestDigest: gmail.testDigest,
     onConnectGmail: gmail.connectGmail,
     onDisconnectGmail: gmail.disconnectGmail,
+    calendarConnected: gcal.calendarConnected,
+    calendarEmail: gcal.calendarEmail,
+    onConnectCalendar: gcal.connectCalendar,
+    onDisconnectCalendar: gcal.disconnectCalendar,
     lang, onSetLang: setLang, t,
   };
 
@@ -183,7 +190,8 @@ export default function AppShell({
             visible={activeTab === 'tasks'} showToast={showToast} t={t} />
           <CalendarView API={API} userId={userId}
             visible={activeTab === 'cal'} showToast={showToast}
-            onEventsChanged={() => setRightRefreshTick(tick => tick + 1)} t={t} />
+            onEventsChanged={() => setRightRefreshTick(tick => tick + 1)} t={t}
+            googleConnected={gcal.calendarConnected} />
           <EmailView API={API} userId={userId} lang={lang}
             visible={activeTab === 'email'} showToast={showToast}
             onOpenSettings={() => setSettingsOpen(true)} t={t} />

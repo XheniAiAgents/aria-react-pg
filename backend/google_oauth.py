@@ -14,7 +14,7 @@ CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 APP_URL       = os.getenv("APP_URL", "http://127.0.0.1:8000")
 REDIRECT_URI  = f"{APP_URL}/auth/google/callback"
-SCOPES        = "https://www.googleapis.com/auth/gmail.readonly"
+SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar"
 
 
 def get_auth_url(user_id: int) -> str:
@@ -144,3 +144,52 @@ def fetch_todays_emails_oauth(token_data: dict) -> list[dict]:
         })
 
     return emails
+
+
+# ── Google Calendar OAuth (separate from Gmail) ───────────────────────────────
+
+CALENDAR_SCOPES = "https://www.googleapis.com/auth/calendar"
+CALENDAR_REDIRECT_URI = f"{APP_URL}/auth/google-calendar/callback"
+
+
+def get_calendar_auth_url(user_id: int) -> str:
+    params = {
+        "client_id":     CLIENT_ID,
+        "redirect_uri":  CALENDAR_REDIRECT_URI,
+        "response_type": "code",
+        "scope":         CALENDAR_SCOPES,
+        "access_type":   "offline",
+        "prompt":        "select_account consent",
+        "state":         str(user_id),
+    }
+    return "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
+
+
+def exchange_calendar_code(code: str) -> dict:
+    resp = requests.post("https://oauth2.googleapis.com/token", data={
+        "code":          code,
+        "client_id":     CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "redirect_uri":  CALENDAR_REDIRECT_URI,
+        "grant_type":    "authorization_code",
+    })
+    resp.raise_for_status()
+    data = resp.json()
+    return {
+        "access_token":  data["access_token"],
+        "refresh_token": data.get("refresh_token"),
+        "token_type":    data.get("token_type", "Bearer"),
+        "expires_in":    data.get("expires_in"),
+    }
+
+
+def get_calendar_account_email(token_data: dict) -> str:
+    """Get the Google account email for the calendar token."""
+    access_token = get_access_token(token_data)
+    resp = requests.get(
+        "https://www.googleapis.com/oauth2/v1/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"}
+    )
+    if resp.ok:
+        return resp.json().get("email", "")
+    return ""

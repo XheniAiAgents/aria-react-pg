@@ -3,12 +3,12 @@ import email
 from email.header import decode_header
 from datetime import datetime, date
 import os
-import anthropic
+from groq import Groq
 from dotenv import load_dotenv
 load_dotenv()
 
 def get_client():
-    return anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    return Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def decode_str(s):
     if s is None:
@@ -88,12 +88,12 @@ EMAILS:
 Write the summary now (max 3 bullets, very short):"""
 
     client = get_client()
-    response = client.messages.create(
-        model="claude-haiku-4-5",
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
         max_tokens=800,
         messages=[{"role": "user", "content": prompt}]
     )
-    return response.content[0].text
+    return response.choices[0].message.content
 
 def test_imap_connection(gmail_address: str, app_password: str) -> bool:
     try:
