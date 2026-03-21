@@ -13,6 +13,45 @@ import './App.css';
 const API = window.location.origin;
 // const API = import.meta.env.VITE_API_URL || window.location.origin;
 
+async function subscribeToPush(userId) {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    const reg = await navigator.serviceWorker.ready;
+
+    // Fetch VAPID public key from backend
+    const res = await fetch(`${API}/push/vapid-public-key`);
+    if (!res.ok) return;
+    const { publicKey } = await res.json();
+
+    // Convert base64 VAPID key to Uint8Array
+    const padding   = '='.repeat((4 - (publicKey.length % 4)) % 4);
+    const base64    = (publicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawKey    = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+
+    const subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: rawKey,
+    });
+
+    const { endpoint, keys } = subscription.toJSON();
+    await fetch(`${API}/push/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        endpoint,
+        p256dh: keys.p256dh,
+        auth:   keys.auth,
+      }),
+    });
+  } catch (e) {
+    console.warn('[push] subscription failed:', e);
+  }
+}
+
 export default function App() {
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState('');
@@ -39,6 +78,8 @@ export default function App() {
       setUserId(u.id);
       setUserName(u.name);
       setUserEmail(u.email || '');
+      // Re-subscribe on page reload (subscription may have expired)
+      subscribeToPush(u.id);
     }
     // Service Worker
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -49,6 +90,8 @@ export default function App() {
     setUserName(user.name);
     setUserEmail(user.email || '');
     localStorage.setItem('aria_user', JSON.stringify({ id: user.id, name: user.name, email: user.email }));
+    // Subscribe to push after login
+    subscribeToPush(user.id);
   }, []);
 
   const handleLogout = useCallback(() => {

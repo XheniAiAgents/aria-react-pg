@@ -35,6 +35,8 @@ from backend.database import (
     update_event_google_id, upsert_google_event, delete_events_not_in_google,
     get_pending_reminders, mark_reminder_sent,
     get_task_reminders, clear_task_reminder,
+    save_push_subscription, get_push_subscriptions,
+    get_all_push_subscriptions_for_users, delete_push_subscription,
     create_link_code, verify_link_code,
     create_reset_token, verify_reset_token, reset_password,
     cleanup_old_data,
@@ -63,35 +65,84 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 # ── Background tasks ──────────────────────────────────────────────────────────
 
+async def send_web_push(subscription: dict, title: str, body: str):
+    """Send a Web Push notification to a single subscription."""
+    try:
+        from pywebpush import webpush, WebPushException
+        vapid_private = os.getenv("VAPID_PRIVATE_KEY", "")
+        vapid_email   = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:aria@example.com")
+        if not vapid_private:
+            return
+        webpush(
+            subscription_info={
+                "endpoint": subscription["endpoint"],
+                "keys": {
+                    "p256dh": subscription["p256dh"],
+                    "auth":   subscription["auth"],
+                },
+            },
+            data=json.dumps({"title": title, "body": body, "icon": "/icons/icon-192.png"}),
+            vapid_private_key=vapid_private,
+            vapid_claims={"sub": vapid_email},
+        )
+    except Exception as wp_err:
+        err_str = str(wp_err)
+        # 404/410 means the subscription is gone — clean it up
+        if "404" in err_str or "410" in err_str:
+            await delete_push_subscription(subscription["endpoint"])
+        else:
+            print(f"[push] Error: {wp_err}")
+
+
 async def reminder_loop():
-    """Send Telegram reminders for events and tasks every minute."""
+    """Send Telegram + Web Push reminders for events and tasks every minute."""
     import telegram
     token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        return
-    bot = telegram.Bot(token=token)
+    bot = telegram.Bot(token) if token else None
     while True:
         try:
-            for event in await get_pending_reminders():
+            pending_events = await get_pending_reminders()
+            pending_tasks  = await get_task_reminders()
+
+            # Collect all unique user IDs that need push too
+            push_user_ids = list({e["user_id"] for e in pending_events} |
+                                  {t["user_id"] for t in pending_tasks})
+            push_subs_by_user: dict[int, list] = {}
+            if push_user_ids:
+                all_subs = await get_all_push_subscriptions_for_users(push_user_ids)
+                for sub in all_subs:
+                    push_subs_by_user.setdefault(sub["user_id"], []).append(sub)
+
+            for event in pending_events:
+                title    = f"⏰ {event['title']}"
+                time_str = event.get("event_time", "")
+                body     = f"Starting at {time_str}" if time_str else "Your event is starting soon"
+                # Telegram
                 tid = event.get("telegram_id")
-                if tid:
-                    time_str = event.get("event_time", "")
+                if bot and tid:
                     msg = f"⏰ Reminder: *{event['title']}*"
                     if time_str:
                         msg += f" at {time_str}"
                     msg += "\n\n— ARIA"
-                    await bot.send_message(
-                        chat_id=tid, text=msg, parse_mode="Markdown"
-                    )
-                    await mark_reminder_sent(event["id"])
-            for task in await get_task_reminders():
+                    await bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
+                # Web Push
+                for sub in push_subs_by_user.get(event["user_id"], []):
+                    await send_web_push(sub, title, body)
+                await mark_reminder_sent(event["id"])
+
+            for task in pending_tasks:
+                title = f"📌 {task['title']}"
+                body  = "Task reminder from ARIA"
+                # Telegram
                 tid = task.get("telegram_id")
-                if tid:
+                if bot and tid:
                     msg = f"📌 Task reminder: *{task['title']}*\n\n— ARIA"
-                    await bot.send_message(
-                        chat_id=tid, text=msg, parse_mode="Markdown"
-                    )
-                    await clear_task_reminder(task["id"])
+                    await bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
+                # Web Push
+                for sub in push_subs_by_user.get(task["user_id"], []):
+                    await send_web_push(sub, title, body)
+                await clear_task_reminder(task["id"])
+
             await cleanup_old_data()
         except Exception as e:
             print(f"[reminder] Error: {e}")
@@ -834,3 +885,29 @@ async def chat_with_file(
         aria_response = await chat(user_id, user_msg, mode, lang)
 
     return {"response": aria_response, "filename": file.filename, "type": extracted["type"]}
+
+
+# ── Web Push ──────────────────────────────────────────────────────────────────
+
+@app.get("/push/vapid-public-key")
+async def get_vapid_public_key():
+    """Return the VAPID public key so the frontend can subscribe."""
+    key = os.getenv("VAPID_PUBLIC_KEY", "")
+    if not key:
+        raise HTTPException(status_code=503, detail="Push not configured")
+    return {"publicKey": key}
+
+
+class PushSubscribeRequest(BaseModel):
+    user_id:  int
+    endpoint: str
+    p256dh:   str
+    auth:     str
+
+
+@app.post("/push/subscribe")
+async def push_subscribe(req: PushSubscribeRequest):
+    """Save a browser push subscription for a user."""
+    await save_push_subscription(req.user_id, req.endpoint, req.p256dh, req.auth)
+    return {"ok": True}
+

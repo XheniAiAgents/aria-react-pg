@@ -151,11 +151,22 @@ async def init_db():
                 calendar_email TEXT NOT NULL
             )
         """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                endpoint   TEXT    NOT NULL UNIQUE,
+                p256dh     TEXT    NOT NULL,
+                auth       TEXT    NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
         # Create indexes for performance
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_mode ON conversations(user_id, mode, created_at)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id, done)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_events_user_date ON events(user_id, event_date)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)")
 
 
 # Keep for backward compatibility
@@ -780,6 +791,54 @@ async def delete_email_account(user_id: int):
     async with pool.acquire() as conn:
         await conn.execute(
             "DELETE FROM email_accounts WHERE user_id = $1", user_id
+        )
+
+
+# ── Push subscriptions ────────────────────────────────────────────────────────
+
+async def save_push_subscription(user_id: int, endpoint: str, p256dh: str, auth: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT(endpoint) DO UPDATE SET
+                 user_id=EXCLUDED.user_id,
+                 p256dh=EXCLUDED.p256dh,
+                 auth=EXCLUDED.auth""",
+            user_id, endpoint, p256dh, auth
+        )
+
+
+async def get_push_subscriptions(user_id: int) -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
+            user_id
+        )
+        return rows_to_list(rows)
+
+
+async def get_all_push_subscriptions_for_users(user_ids: list[int]) -> list:
+    """Get all push subscriptions for a list of user IDs (used by reminder loop)."""
+    if not user_ids:
+        return []
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT user_id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1::int[])",
+            user_ids
+        )
+        return rows_to_list(rows)
+
+
+async def delete_push_subscription(endpoint: str):
+    """Remove a subscription (e.g. when the browser rejects it as expired)."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM push_subscriptions WHERE endpoint = $1", endpoint
         )
 
 
