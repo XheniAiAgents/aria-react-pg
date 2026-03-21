@@ -923,3 +923,20 @@ async def push_subscribe(req: PushSubscribeRequest):
     await save_push_subscription(req.user_id, req.endpoint, req.p256dh, req.auth)
     return {"ok": True}
 
+
+
+# ── Debug endpoint (temporary) ────────────────────────────────────────────────
+@app.get("/debug/tasks/{user_id}")
+async def debug_tasks(user_id: int):
+    """Show raw reminder_at values vs NOW() for debugging."""
+    from backend.database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT id, title, reminder_at,
+               NOW() as now,
+               reminder_at::timestamptz <= NOW() as is_due
+               FROM tasks WHERE user_id = $1 AND done = 0""",
+            user_id
+        )
+        return [dict(r) for r in rows]
