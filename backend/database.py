@@ -407,11 +407,10 @@ async def get_task_reminders() -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT t.*, u.telegram_id FROM tasks t
+            """SELECT t.*, u.telegram_id, u.id as user_id FROM tasks t
                JOIN users u ON t.user_id = u.id
                WHERE t.done = 0
                AND t.reminder_at IS NOT NULL
-               AND u.telegram_id IS NOT NULL
                AND t.reminder_at::timestamptz <= NOW()""",
         )
         return rows_to_list(rows)
@@ -555,10 +554,9 @@ async def get_pending_reminders() -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT e.*, u.telegram_id FROM events e
+            """SELECT e.*, u.telegram_id, u.id as user_id FROM events e
                JOIN users u ON e.user_id = u.id
                WHERE e.reminded = 0
-               AND u.telegram_id IS NOT NULL
                AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz
                    - (e.reminder_minutes || ' minutes')::interval <= NOW()
                AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz >= NOW()"""
