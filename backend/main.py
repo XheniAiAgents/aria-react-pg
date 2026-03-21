@@ -940,3 +940,19 @@ async def debug_tasks(user_id: int):
             user_id
         )
         return [dict(r) for r in rows]
+
+
+@app.get("/debug/tz")
+async def debug_tz():
+    """Check PostgreSQL timezone settings."""
+    from backend.database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT 
+                NOW() as now_utc,
+                current_setting('timezone') as pg_timezone,
+                '2026-03-22T00:19'::timestamptz as reminder_cast,
+                '2026-03-22T00:19'::timestamptz <= NOW() as is_due
+        """)
+        return [dict(r) for r in rows]
