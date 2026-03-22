@@ -294,6 +294,12 @@ if assets_path.exists():
 if icons_path.exists():
     app.mount("/icons", StaticFiles(directory=str(icons_path)), name="icons")
 
+@app.get("/aria-avatar.png")
+async def aria_avatar():
+    p = frontend_path / "aria-avatar.png"
+    if p.exists():
+        return FileResponse(str(p), media_type="image/png")
+    raise HTTPException(status_code=404, detail="Avatar not found")
 
 # ── Request models ────────────────────────────────────────────────────────────
 
