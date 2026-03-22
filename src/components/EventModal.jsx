@@ -235,7 +235,14 @@ export default function EventModal({ API, userId, selectedDate, open, onClose, o
   }
 
   async function submitEvent() {
-    if (!title.trim() || !date) { showToast('Title and date required.', true); return; }
+    if (!title.trim()) { showToast('Please add a title.', true); return; }
+    if (!date) { showToast('Please pick a date.', true); return; }
+    // Date in the past check
+    const today = new Date(); today.setHours(0,0,0,0);
+    const picked = new Date(date + 'T00:00:00');
+    if (picked < today) { showToast('Date cannot be in the past.', true); return; }
+    // End time before start time check
+    if (time && endTime && endTime <= time) { showToast('End time must be after start time.', true); return; }
     const utcTime = time ? localTimeToUTC(date, time) : null;
     const utcEndTime = endTime ? localTimeToUTC(date, endTime) : null;
     const body = { user_id: userId, title, event_date: date, event_time: utcTime, end_time: utcEndTime, description: desc || null, reminder_minutes: parseInt(remind) || 15 };

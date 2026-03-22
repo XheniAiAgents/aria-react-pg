@@ -114,8 +114,10 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   const dayEvents = calEvents[selectedDate] || [];
   const upcoming = [];
+  const past = [];
   Object.keys(calEvents).sort().forEach(ds => {
     if (ds > todayStr) calEvents[ds].forEach(e => upcoming.push({ ...e, dateStr: ds }));
+    else if (ds < todayStr) calEvents[ds].forEach(e => past.push({ ...e, dateStr: ds }));
   });
 
   const todayLabel = t ? t('today') : 'Today';
@@ -155,23 +157,23 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   return (
     <div id="calView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflowY: 'auto', padding: '24px 32px' }}>
       {/* Header */}
-      <div className="cal-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+      <div className="cal-header" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
         {googleConnected ? (
           <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
-            style={{ opacity: syncing ? 0.6 : 1, flexShrink: 0 }}>
+            style={{ opacity: syncing ? 0.6 : 1, flexShrink: 0, padding: '8px 10px' }}>
             {syncing ? '⟳' : '↻'} Sync
           </button>
-        ) : <div style={{ flex: '0 0 60px' }} />}
-        <div className="cal-nav" style={{ flex: 1, justifyContent: 'center' }}>
+        ) : <div style={{ flex: '0 0 50px' }} />}
+        <div className="cal-nav" style={{ flex: 1 }}>
           <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
-          <span className="cal-month-label">{MONTHS[month]} {year}</span>
+          <span className="cal-month-label" style={{ fontSize: '13px' }}>{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         </div>
-        <button className="add-btn" onClick={openAddModal} style={{ flexShrink: 0 }}>
+        <button className="add-btn" onClick={openAddModal} style={{ flexShrink: 0, padding: '8px 10px' }}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          <span className="cal-add-label">{addEventLabel}</span>
+          <span>{addEventLabel}</span>
         </button>
       </div>
 
@@ -228,6 +230,19 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
             return renderEventItem(e, dateLabel);
           })}
       </div>
+
+      {/* Past events */}
+      {past.length > 0 && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="cal-events-header">
+            <div className="cal-events-title" style={{ color: 'var(--ghost)' }}>Past — last 7 days</div>
+          </div>
+          {past.slice(-6).reverse().map((e) => {
+            const dateLabel = new Date(e.dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            return renderEventItem(e, dateLabel);
+          })}
+        </div>
+      )}
 
       {/* Google Calendar hint */}
       {!googleConnected && (
