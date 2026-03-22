@@ -35,6 +35,7 @@ from backend.database import (
     update_event_google_id, upsert_google_event, delete_events_not_in_google,
     get_pending_reminders, mark_reminder_sent,
     update_user_timezone, get_user_timezone,
+    admin_get_all_users, admin_toggle_user, admin_delete_user, admin_get_stats,
     get_task_reminders, clear_task_reminder,
     save_push_subscription, get_push_subscriptions,
     get_all_push_subscriptions_for_users, delete_push_subscription,
@@ -414,6 +415,8 @@ async def auth_login(req: EmailLoginRequest, request: Request):
     user = await login_user(req.email, req.password)
     if not user:
         raise HTTPException(401, "Invalid email or password")
+    if user.get("is_disabled"):
+        raise HTTPException(403, "Account disabled. Please contact support.")
     return {"user": {k: v for k, v in user.items() if k not in ("password_hash", "password_salt")}}
 
 
@@ -648,6 +651,60 @@ async def set_user_timezone(user_id: int, timezone: str):
 async def get_timezone(user_id: int):
     tz = await get_user_timezone(user_id)
     return {"timezone": tz}
+
+
+# ── Admin endpoints ───────────────────────────────────────────────────────────
+
+import os as _os
+
+def _check_admin(password: str):
+    admin_pw = _os.environ.get("ADMIN_PASSWORD", "")
+    if not admin_pw or password != admin_pw:
+        raise HTTPException(status_code=401, detail="Invalid admin password")
+
+
+@app.get("/admin/stats")
+async def admin_stats(password: str):
+    _check_admin(password)
+    return await admin_get_stats()
+
+
+@app.get("/admin/users")
+async def admin_users(password: str):
+    _check_admin(password)
+    users = await admin_get_all_users()
+    # Convert datetime objects to strings
+    result = []
+    for u in users:
+        result.append({
+            "id": u["id"],
+            "name": u["name"],
+            "email": u["email"],
+            "timezone": u.get("timezone", "Europe/Madrid"),
+            "is_disabled": u.get("is_disabled", False),
+            "task_count": u.get("task_count", 0),
+            "event_count": u.get("event_count", 0),
+            "note_count": u.get("note_count", 0),
+            "message_count": u.get("message_count", 0),
+            "push_count": u.get("push_count", 0),
+            "created_at": str(u["created_at"])[:10] if u.get("created_at") else None,
+            "last_active": str(u["last_active"])[:16].replace("T", " ") if u.get("last_active") else "Never",
+        })
+    return result
+
+
+@app.post("/admin/users/{user_id}/toggle")
+async def admin_toggle(user_id: int, password: str, disabled: bool):
+    _check_admin(password)
+    await admin_toggle_user(user_id, disabled)
+    return {"status": "ok"}
+
+
+@app.delete("/admin/users/{user_id}")
+async def admin_delete(user_id: int, password: str):
+    _check_admin(password)
+    await admin_delete_user(user_id)
+    return {"status": "deleted"}
 
 
 @app.get("/auth/google/start")

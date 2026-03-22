@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARIA — Admin Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', system-ui, sans-serif; background: #0f0f0f; color: #d4cbb8; min-height: 100vh; }
+  
+  /* LOGIN */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .login-box { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; padding: 40px; width: 340px; text-align: center; }
+  .login-box h1 { font-size: 28px; color: #b8973d; margin-bottom: 4px; letter-spacing: -0.02em; }
+  .login-box p { font-size: 12px; color: #666; margin-bottom: 24px; }
+  .login-box input { width: 100%; padding: 10px 14px; background: #111; border: 1px solid #333; border-radius: 8px; color: #d4cbb8; font-size: 13px; margin-bottom: 12px; outline: none; }
+  .login-box input:focus { border-color: #b8973d; }
+  .btn-gold { width: 100%; padding: 11px; background: #b8973d; border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+  .btn-gold:hover { opacity: 0.85; }
+  .err { color: #e05c5c; font-size: 11px; margin-top: 8px; }
+
+  /* DASHBOARD */
+  #dashboard { display: none; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: #141414; border-bottom: 1px solid #222; position: sticky; top: 0; z-index: 10; }
+  .topbar h1 { font-size: 18px; color: #b8973d; letter-spacing: -0.01em; }
+  .topbar span { font-size: 11px; color: #555; }
+  .logout-btn { background: none; border: 1px solid #333; border-radius: 6px; color: #888; font-size: 11px; padding: 5px 12px; cursor: pointer; }
+  .logout-btn:hover { border-color: #555; color: #aaa; }
+
+  .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .stat-card { background: #1a1a1a; border: 1px solid #252525; border-radius: 12px; padding: 16px 18px; }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: #b8973d; line-height: 1; margin-bottom: 4px; }
+  .stat-card .label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* USERS TABLE */
+  .section-title { font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; font-weight: 600; }
+  .table-wrap { background: #1a1a1a; border: 1px solid #252525; border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead tr { background: #141414; }
+  th { padding: 10px 14px; text-align: left; font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; white-space: nowrap; }
+  td { padding: 11px 14px; border-top: 1px solid #222; color: #aaa; white-space: nowrap; }
+  tr:hover td { background: #1e1e1e; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+  .badge.active { background: rgba(39,174,96,0.15); color: #27ae60; }
+  .badge.disabled { background: rgba(224,92,92,0.12); color: #e05c5c; }
+  .user-name { color: #d4cbb8; font-weight: 500; }
+  .user-email { color: #555; font-size: 11px; }
+  .stat-num { color: #b8973d; font-weight: 600; }
+  .action-btn { padding: 4px 10px; border-radius: 5px; font-size: 10px; cursor: pointer; border: 1px solid; transition: all 0.15s; }
+  .action-btn.disable { border-color: #e05c5c44; color: #e05c5c; background: transparent; }
+  .action-btn.disable:hover { background: rgba(224,92,92,0.1); }
+  .action-btn.enable { border-color: #27ae6044; color: #27ae60; background: transparent; }
+  .action-btn.enable:hover { background: rgba(39,174,96,0.1); }
+  .action-btn.delete { border-color: #44444444; color: #555; background: transparent; margin-left: 4px; }
+  .action-btn.delete:hover { border-color: #e05c5c44; color: #e05c5c; }
+  .refresh-btn { background: none; border: 1px solid #333; border-radius: 7px; color: #888; font-size: 11px; padding: 6px 14px; cursor: pointer; margin-bottom: 12px; }
+  .refresh-btn:hover { border-color: #b8973d; color: #b8973d; }
+  .loading { text-align: center; padding: 40px; color: #444; font-size: 12px; }
+  .tz { font-size: 10px; color: #444; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-box">
+    <h1>ARIA</h1>
+    <p>Admin Dashboard</p>
+    <input type="password" id="pw-input" placeholder="Admin password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="btn-gold" onclick="doLogin()">Access Dashboard</button>
+    <div class="err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="topbar">
+    <h1>✦ ARIA Admin</h1>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span id="server-url"></span>
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+  <div class="main">
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="num" id="s-users">—</div><div class="label">Total Users</div></div>
+      <div class="stat-card"><div class="num" id="s-events">—</div><div class="label">Active Events</div></div>
+      <div class="stat-card"><div class="num" id="s-tasks">—</div><div class="label">Pending Tasks</div></div>
+      <div class="stat-card"><div class="num" id="s-push">—</div><div class="label">Push Devices</div></div>
+      <div class="stat-card"><div class="num" id="s-msgs">—</div><div class="label">Messages (24h)</div></div>
+    </div>
+
+    <!-- Users -->
+    <div class="section-title">Users</div>
+    <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Timezone</th>
+            <th>Registered</th>
+            <th>Last Active</th>
+            <th>Tasks</th>
+            <th>Events</th>
+            <th>Notes</th>
+            <th>Messages</th>
+            <th>Devices</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody">
+          <tr><td colspan="11" class="loading">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let adminPw = '';
+
+async function doLogin() {
+  const pw = document.getElementById('pw-input').value.trim();
+  if (!pw) return;
+  try {
+    const r = await fetch(`${API}/admin/stats?password=${encodeURIComponent(pw)}`);
+    if (!r.ok) { document.getElementById('login-err').textContent = 'Invalid password'; return; }
+    adminPw = pw;
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('server-url').textContent = API;
+    loadStats();
+    loadUsers();
+  } catch(e) {
+    document.getElementById('login-err').textContent = 'Cannot reach server';
+  }
+}
+
+function doLogout() {
+  adminPw = '';
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('pw-input').value = '';
+}
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/admin/stats?password=${encodeURIComponent(adminPw)}`);
+    const d = await r.json();
+    document.getElementById('s-users').textContent = d.total_users ?? '—';
+    document.getElementById('s-events').textContent = d.total_events ?? '—';
+    document.getElementById('s-tasks').textContent = d.pending_tasks ?? '—';
+    document.getElementById('s-push').textContent = d.push_subscriptions ?? '—';
+    document.getElementById('s-msgs').textContent = d.messages_24h ?? '—';
+  } catch(e) {}
+}
+
+async function loadUsers() {
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = '<tr><td colspan="11" class="loading">Loading...</td></tr>';
+  try {
+    const r = await fetch(`${API}/admin/users?password=${encodeURIComponent(adminPw)}`);
+    const users = await r.json();
+    if (!users.length) { tbody.innerHTML = '<tr><td colspan="11" class="loading">No users found</td></tr>'; return; }
+    tbody.innerHTML = users.map(u => `
+      <tr id="row-${u.id}">
+        <td>
+          <div class="user-name">${esc(u.name)}</div>
+          <div class="user-email">${esc(u.email || '—')}</div>
+        </td>
+        <td class="tz">${esc(u.timezone || 'Europe/Madrid')}</td>
+        <td>${u.created_at || '—'}</td>
+        <td>${u.last_active || 'Never'}</td>
+        <td class="stat-num">${u.task_count}</td>
+        <td class="stat-num">${u.event_count}</td>
+        <td class="stat-num">${u.note_count}</td>
+        <td class="stat-num">${u.message_count}</td>
+        <td class="stat-num">${u.push_count}</td>
+        <td><span class="badge ${u.is_disabled ? 'disabled' : 'active'}">${u.is_disabled ? 'Disabled' : 'Active'}</span></td>
+        <td>
+          <button class="action-btn ${u.is_disabled ? 'enable' : 'disable'}"
+            onclick="toggleUser(${u.id}, ${!u.is_disabled})">
+            ${u.is_disabled ? 'Enable' : 'Disable'}
+          </button>
+          <button class="action-btn delete" onclick="deleteUser(${u.id}, '${esc(u.name)}')">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="11" class="loading">Error loading users</td></tr>';
+  }
+}
+
+async function toggleUser(userId, disable) {
+  if (disable && !confirm(`Disable this user? They won't be able to log in.`)) return;
+  await fetch(`${API}/admin/users/${userId}/toggle?password=${encodeURIComponent(adminPw)}&disabled=${disable}`, { method: 'POST' });
+  loadUsers(); loadStats();
+}
+
+async function deleteUser(userId, name) {
+  if (!confirm(`Permanently delete "${name}" and all their data? This cannot be undone.`)) return;
+  await fetch(`${API}/admin/users/${userId}?password=${encodeURIComponent(adminPw)}`, { method: 'DELETE' });
+  loadUsers(); loadStats();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

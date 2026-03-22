@@ -52,6 +52,7 @@ async def init_db():
                 password_salt TEXT,
                 telegram_id   TEXT    UNIQUE,
                 timezone      TEXT    DEFAULT 'Europe/Madrid',
+                is_disabled   BOOLEAN DEFAULT FALSE,
                 created_at    TIMESTAMPTZ DEFAULT NOW()
             )
         """)
@@ -169,6 +170,7 @@ async def init_db():
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)")
         await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Europe/Madrid'")
+        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN DEFAULT FALSE")
 
 
 # Keep for backward compatibility
@@ -805,6 +807,63 @@ async def get_user_timezone(user_id: int) -> str:
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT timezone FROM users WHERE id = $1", user_id)
         return row["timezone"] if row and row["timezone"] else "Europe/Madrid"
+
+
+# ── Admin ─────────────────────────────────────────────────────────────────────
+
+async def admin_get_all_users() -> list:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT
+                u.id,
+                u.name,
+                u.email,
+                u.timezone,
+                u.created_at,
+                u.is_disabled,
+                (SELECT COUNT(*) FROM tasks t WHERE t.user_id = u.id) as task_count,
+                (SELECT COUNT(*) FROM events e WHERE e.user_id = u.id) as event_count,
+                (SELECT COUNT(*) FROM notes n WHERE n.user_id = u.id) as note_count,
+                (SELECT COUNT(*) FROM conversations c WHERE c.user_id = u.id) as message_count,
+                (SELECT COUNT(*) FROM push_subscriptions ps WHERE ps.user_id = u.id) as push_count,
+                (SELECT MAX(created_at) FROM conversations c2 WHERE c2.user_id = u.id) as last_active
+            FROM users u
+            ORDER BY u.created_at DESC
+        """)
+        return rows_to_list(rows)
+
+
+async def admin_toggle_user(user_id: int, disabled: bool):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE users SET is_disabled = $1 WHERE id = $2",
+            disabled, user_id
+        )
+
+
+async def admin_delete_user(user_id: int):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM users WHERE id = $1", user_id)
+
+
+async def admin_get_stats() -> dict:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        users = await conn.fetchval("SELECT COUNT(*) FROM users")
+        events = await conn.fetchval("SELECT COUNT(*) FROM events")
+        tasks = await conn.fetchval("SELECT COUNT(*) FROM tasks WHERE done = 0")
+        push_subs = await conn.fetchval("SELECT COUNT(*) FROM push_subscriptions")
+        messages = await conn.fetchval("SELECT COUNT(*) FROM conversations WHERE created_at > NOW() - INTERVAL '24 hours'")
+        return {
+            "total_users": users,
+            "total_events": events,
+            "pending_tasks": tasks,
+            "push_subscriptions": push_subs,
+            "messages_24h": messages,
+        }
 
 
 # ── Push subscriptions ────────────────────────────────────────────────────────
