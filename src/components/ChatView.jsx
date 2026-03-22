@@ -202,13 +202,13 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
           );
           if (msg.type === 'typing') return (
             <div key={i} className="typing">
-              <div className="a-orb">A</div>
+              <div className="a-orb"><img src="/aria-avatar.png" alt="ARIA" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:"50%"}}/></div>
               <div className="t-bubble"><div className="td"/><div className="td"/><div className="td"/></div>
             </div>
           );
           return (
             <div key={i} className="amsg">
-              <div className="a-orb">A</div>
+              <div className="a-orb"><img src="/aria-avatar.png" alt="ARIA" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:"50%"}}/></div>
               <div>
                 <div className="a-meta">ARIA <span className="a-time">{msg.time}</span></div>
                 <div className="a-bubble" dangerouslySetInnerHTML={{ __html: fmt(msg.text) }} />
