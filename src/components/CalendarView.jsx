@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import EventModal from './EventModal';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -27,8 +27,15 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     } catch {}
   }, [API, userId, year, month]);
 
+  const lastSyncRef = useRef(0);
   const syncGoogleCalendar = useCallback(async (silent = false) => {
     if (!googleConnected) return;
+    // Cooldown: don't sync more than once per 60 seconds silently
+    if (silent) {
+      const now = Date.now();
+      if (now - lastSyncRef.current < 60000) return;
+      lastSyncRef.current = now;
+    }
     setSyncing(true);
     try {
       const res = await fetch(`${API}/calendar/sync/${userId}`, { method: 'POST' });
