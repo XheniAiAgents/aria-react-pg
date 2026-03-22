@@ -662,6 +662,17 @@ def _check_admin(password: str):
     if not admin_pw or password != admin_pw:
         raise HTTPException(status_code=401, detail="Invalid admin password")
 
+@app.get("/admin")
+async def admin_page():
+    from fastapi.responses import FileResponse
+    import os
+    admin_path = os.path.join(os.path.dirname(__file__), "admin.html")
+    if not os.path.exists(admin_path):
+        admin_path = os.path.join(os.path.dirname(__file__), "frontend", "admin.html")
+    if os.path.exists(admin_path):
+        return FileResponse(admin_path)
+    raise HTTPException(status_code=404, detail="Admin page not found")
+
 
 @app.get("/admin/stats")
 async def admin_stats(password: str):
