@@ -1,5 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Convert local HH:MM to UTC HH:MM for backend storage
+function localTimeToUTC(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return timeStr;
+  const d = new Date(`${dateStr}T${timeStr}:00`);
+  return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+}
+
+// Convert UTC HH:MM from backend to local HH:MM for display
+function utcTimeToLocal(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return timeStr;
+  const d = new Date(`${dateStr}T${timeStr}:00Z`);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 function CircularWheel({ items, value, onChange, height = 160 }) {
   const ref = useRef(null);
   const itemH = 40;
@@ -182,8 +196,8 @@ export default function EventModal({ API, userId, selectedDate, open, onClose, o
     if (isEdit) {
       setTitle(editEvent.title || '');
       setDate(editEvent.event_date || '');
-      setTime(editEvent.event_time || '');
-      setEndTime(editEvent.end_time || '');
+      setTime(editEvent.event_time ? utcTimeToLocal(editEvent.event_date, editEvent.event_time) : '');
+      setEndTime(editEvent.end_time ? utcTimeToLocal(editEvent.event_date, editEvent.end_time) : '');
       setDesc(editEvent.description || '');
       setRemind(String(editEvent.reminder_minutes || 15));
     } else {
@@ -211,9 +225,9 @@ export default function EventModal({ API, userId, selectedDate, open, onClose, o
 
   async function submitEvent() {
     if (!title.trim() || !date) { showToast('Title and date required.', true); return; }
-    
-    
-    const body = { user_id: userId, title, event_date: date, event_time: time || null, end_time: endTime || null, description: desc || null, reminder_minutes: parseInt(remind) || 15 };
+    const utcTime = time ? localTimeToUTC(date, time) : null;
+    const utcEndTime = endTime ? localTimeToUTC(date, endTime) : null;
+    const body = { user_id: userId, title, event_date: date, event_time: utcTime, end_time: utcEndTime, description: desc || null, reminder_minutes: parseInt(remind) || 15 };
     if (isEdit) {
       await fetch(`${API}/events/${editEvent.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       onClose(); onEdited && onEdited(); showToast('Event updated.');
