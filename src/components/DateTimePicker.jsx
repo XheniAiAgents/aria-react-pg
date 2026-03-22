@@ -65,7 +65,7 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
   const ref = useRef(null);
 
   const hours = Array.from({length:24},(_,i)=>i);
-  const mins  = Array.from({length:12},(_,i)=>i*5);
+  const mins  = Array.from({length:60},(_,i)=>i);
 
   useEffect(() => {
     if (value) {
@@ -73,7 +73,7 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
       if (!isNaN(d)) {
         setSelDate(d);
         setSelHour(d.getHours());
-        const roundedMin = Math.round(d.getMinutes()/5)*5 % 60;
+        const roundedMin = d.getMinutes();
         setSelMin(roundedMin);
         setMonth(d.getMonth());
         setYear(d.getFullYear());

@@ -150,13 +150,13 @@ async def reminder_loop():
                 await mark_reminder_sent(event["id"])
 
             for task in pending_tasks:
-                title = f"📌 {task['title']}"
-                body  = "Task reminder from ARIA"
+                title = f"🔔 {task['title']}"
+                body  = "— ARIA"
                 print(f"[reminder] task '{task['title']}' user={task['user_id']}")
                 # Telegram
                 tid = task.get("telegram_id")
                 if bot and tid:
-                    msg = f"📌 Task reminder: *{task['title']}*\n\n— ARIA"
+                    msg = f"🔔 Task reminder: *{task['title']}*\n\n— ARIA"
                     await bot.send_message(chat_id=tid, text=msg, parse_mode="Markdown")
                 # Web Push
                 subs = push_subs_by_user.get(task["user_id"], [])
