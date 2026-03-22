@@ -171,7 +171,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
             onKeyDown={e => e.key === 'Enter' && submitTask()} />
           <DateTimePicker value={newReminder} onChange={setNewReminder} />
         </div>
-        <div className="form-actions">
+        <div className="form-actions" style={{ marginTop: '8px' }}>
           <button className="btn-ghost" onClick={() => { setAddOpen(false); setNewTitle(''); setNewReminder(null); }}>Cancel</button>
           <button className="btn-primary" onClick={submitTask}>Add</button>
         </div>
