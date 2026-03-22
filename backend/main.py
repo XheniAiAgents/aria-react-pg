@@ -65,6 +65,55 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 # ── Background tasks ──────────────────────────────────────────────────────────
 
+
+def pick_event_emoji(title: str) -> str:
+    """Pick an emoji based on event title keywords."""
+    t = title.lower()
+    if any(k in t for k in ['meeting', 'call', 'zoom', 'teams', 'interview', 'presentation', 'review']):
+        return '🤝'
+    if any(k in t for k in ['email', 'report', 'deadline']):
+        return '📋'
+    if any(k in t for k in ['office', 'work']):
+        return '💼'
+    if any(k in t for k in ['doctor', 'physician', 'checkup', 'hospital']):
+        return '🏥'
+    if any(k in t for k in ['dentist']):
+        return '🦷'
+    if any(k in t for k in ['gym', 'workout', 'training', 'exercise', 'run', 'yoga', 'pilates']):
+        return '💪'
+    if any(k in t for k in ['pharmacy', 'medicine']):
+        return '💊'
+    if any(k in t for k in ['therapy', 'therapist']):
+        return '🧠'
+    if any(k in t for k in ['lunch', 'dinner', 'breakfast', 'brunch', 'eat', 'restaurant']):
+        return '🍽️'
+    if any(k in t for k in ['coffee', 'cafe']):
+        return '☕'
+    if any(k in t for k in ['drinks', 'bar']):
+        return '🍷'
+    if any(k in t for k in ['party', 'birthday', 'celebration']):
+        return '🎂'
+    if any(k in t for k in ['flight', 'airport', 'plane']):
+        return '✈️'
+    if any(k in t for k in ['train']):
+        return '🚂'
+    if any(k in t for k in ['hotel']):
+        return '🏨'
+    if any(k in t for k in ['trip', 'travel', 'vacation', 'holiday']):
+        return '🧳'
+    if any(k in t for k in ['shopping', 'groceries', 'supermarket']):
+        return '🛒'
+    if any(k in t for k in ['haircut', 'salon', 'barber']):
+        return '✂️'
+    if any(k in t for k in ['bank']):
+        return '🏦'
+    if any(k in t for k in ['school', 'class', 'course', 'lecture', 'university']):
+        return '📚'
+    if any(k in t for k in ['phone', 'call mom', 'call dad', 'call parents']):
+        return '📞'
+    return '✨'
+
+
 async def send_web_push(subscription: dict, title: str, body: str):
     """Send a Web Push notification to a single subscription."""
     try:
@@ -130,14 +179,15 @@ async def reminder_loop():
                     push_subs_by_user.setdefault(sub["user_id"], []).append(sub)
 
             for event in pending_events:
-                title    = f"⏰ {event['title']}"
+                emoji    = pick_event_emoji(event['title'])
+                title    = f"{emoji} {event['title']}"
                 time_str = event.get("event_time", "")
                 body     = f"Starting at {time_str}" if time_str else "Your event is starting soon"
                 print(f"[reminder] event '{event['title']}' user={event['user_id']}")
                 # Telegram
                 tid = event.get("telegram_id")
                 if bot and tid:
-                    msg = f"⏰ Reminder: *{event['title']}*"
+                    msg = f"{emoji} Reminder: *{event['title']}*"
                     if time_str:
                         msg += f" at {time_str}"
                     msg += "\n\n— ARIA"

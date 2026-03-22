@@ -156,25 +156,23 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     <div id="calView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflowY: 'auto', padding: '24px 32px' }}>
       {/* Header */}
       <div className="cal-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <div className="cal-nav" style={{ flex: 1 }}>
+        {googleConnected ? (
+          <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
+            style={{ opacity: syncing ? 0.6 : 1, flexShrink: 0 }}>
+            {syncing ? '⟳' : '↻'} Sync
+          </button>
+        ) : <div style={{ flex: '0 0 60px' }} />}
+        <div className="cal-nav" style={{ flex: 1, justifyContent: 'center' }}>
           <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
           <span className="cal-month-label">{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {googleConnected && (
-            <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
-              style={{ opacity: syncing ? 0.6 : 1 }}>
-              {syncing ? '⟳' : '↻'} Sync
-            </button>
-          )}
-          <button className="add-btn" onClick={openAddModal}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            {addEventLabel}
-          </button>
-        </div>
+        <button className="add-btn" onClick={openAddModal} style={{ flexShrink: 0 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          {addEventLabel}
+        </button>
       </div>
 
       {/* Grid */}

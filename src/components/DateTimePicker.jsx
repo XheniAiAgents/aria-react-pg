@@ -6,49 +6,65 @@ const DAYS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 function ScrollWheel({ value, onChange, items, height = 200 }) {
   const ref = useRef(null);
   const itemH = 44;
+  // Triple the items for infinite scroll illusion
+  const tripled = [...items, ...items, ...items];
+  const offset = items.length;
 
   useEffect(() => {
     const idx = items.indexOf(value);
     if (ref.current && idx >= 0) {
-      ref.current.scrollTop = idx * itemH;
+      ref.current.scrollTop = (offset + idx) * itemH;
     }
   }, [value]);
 
   function handleScroll() {
     if (!ref.current) return;
-    const idx = Math.round(ref.current.scrollTop / itemH);
-    const clamped = Math.max(0, Math.min(items.length - 1, idx));
-    if (items[clamped] !== value) onChange(items[clamped]);
+    const scrollTop = ref.current.scrollTop;
+    const idx = Math.round(scrollTop / itemH);
+    // Wrap around
+    if (idx < items.length / 2) {
+      ref.current.scrollTop = scrollTop + items.length * itemH;
+      return;
+    }
+    if (idx >= items.length * 2.5) {
+      ref.current.scrollTop = scrollTop - items.length * itemH;
+      return;
+    }
+    const realIdx = idx % items.length;
+    if (items[realIdx] !== value) onChange(items[realIdx]);
   }
 
   return (
     <div style={{ position: 'relative', width: '100%', height }}>
-      {/* Fade top */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(to bottom, var(--surface), transparent)', zIndex: 2, pointerEvents: 'none' }} />
-      {/* Fade bottom */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(to top, var(--surface), transparent)', zIndex: 2, pointerEvents: 'none' }} />
-      {/* Selection highlight */}
       <div style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', left: 0, right: 0, height: itemH, background: 'var(--w3)', borderTop: '1px solid var(--w-line)', borderBottom: '1px solid var(--w-line)', zIndex: 1, pointerEvents: 'none', borderRadius: '4px' }} />
-      {/* Scroll container */}
       <div ref={ref} onScroll={handleScroll} style={{
         height: '100%', overflowY: 'scroll', scrollSnapType: 'y mandatory',
         scrollbarWidth: 'none', msOverflowStyle: 'none',
         paddingTop: height/2 - itemH/2, paddingBottom: height/2 - itemH/2,
       }}>
         <style>{`div::-webkit-scrollbar{display:none}`}</style>
-        {items.map((item, i) => (
-          <div key={i} onClick={() => { onChange(item); if(ref.current) ref.current.scrollTop = i * itemH; }}
-            style={{
-              height: itemH, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              scrollSnapAlign: 'center', cursor: 'pointer', position: 'relative', zIndex: 3,
-              fontSize: item === value ? '28px' : '18px',
-              fontFamily: 'Cormorant Garamond, serif',
-              fontWeight: item === value ? 400 : 300,
-              color: item === value ? 'var(--ink)' : 'var(--ghost)',
-              transition: 'all 0.15s',
-              letterSpacing: '-0.01em',
-            }}>{typeof item === 'number' ? String(item).padStart(2,'0') : item}</div>
-        ))}
+        {tripled.map((item, i) => {
+          const realItem = items[i % items.length];
+          const isSelected = realItem === value;
+          return (
+            <div key={i} onClick={() => {
+              onChange(realItem);
+              if(ref.current) ref.current.scrollTop = (offset + items.indexOf(realItem)) * itemH;
+            }}
+              style={{
+                height: itemH, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                scrollSnapAlign: 'center', cursor: 'pointer', position: 'relative', zIndex: 3,
+                fontSize: isSelected ? '28px' : '18px',
+                fontFamily: 'Cormorant Garamond, serif',
+                fontWeight: isSelected ? 400 : 300,
+                color: isSelected ? 'var(--ink)' : 'var(--ghost)',
+                transition: 'all 0.15s',
+                letterSpacing: '-0.01em',
+              }}>{String(item).padStart(2,'0')}</div>
+          );
+        })}
       </div>
     </div>
   );
