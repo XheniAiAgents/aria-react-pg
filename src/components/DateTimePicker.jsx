@@ -74,6 +74,7 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('date');
   const [selDate, setSelDate] = useState(null);
+  const [timeMode, setTimeMode] = useState('wheel');
   const [selHour, setSelHour] = useState(9);
   const [selMin, setSelMin] = useState(0);
   const [month, setMonth] = useState(new Date().getMonth());
@@ -219,22 +220,49 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
 
           {view === 'time' && (
             <div>
-              <p style={{fontSize:'11px',color:'var(--ghost)',textAlign:'center',marginBottom:'12px',letterSpacing:'0.06em',textTransform:'uppercase'}}>
+              <p style={{fontSize:'11px',color:'var(--ghost)',letterSpacing:'0.06em',textTransform:'uppercase',margin:'0 0 10px 0',textAlign:'center'}}>
                 {selDate?selDate.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}):'Pick a date first'}
               </p>
 
-              {/* Drum roll wheels */}
-              <div style={{display:'flex',gap:'0',alignItems:'center',justifyContent:'center'}}>
-                <div style={{flex:1}}>
-                  <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Hour</div>
-                  <ScrollWheel value={selHour} onChange={setSelHour} items={hours} height={180} />
+              {timeMode === 'wheel' ? (
+                <>
+                <div onClick={()=>setTimeMode('keyboard')}
+                  style={{textAlign:'center',fontSize:'38px',fontFamily:'Cormorant Garamond,serif',color:'var(--ink)',
+                    letterSpacing:'-0.02em',marginBottom:'8px',cursor:'pointer',
+                    borderBottom:'1px dashed var(--trace)',paddingBottom:'8px'}}
+                  title="Tap to type">
+                  {String(selHour??9).padStart(2,'0')}<span style={{color:'var(--a1)'}}>:</span>{String(selMin??0).padStart(2,'0')}
                 </div>
-                <div style={{fontSize:'32px',fontFamily:'Cormorant Garamond,serif',color:'var(--a1)',padding:'0 8px',marginTop:'8px'}}>:</div>
-                <div style={{flex:1}}>
-                  <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Min</div>
-                  <ScrollWheel value={selMin} onChange={setSelMin} items={mins} height={180} />
+                <div style={{display:'flex',gap:'0',alignItems:'center',justifyContent:'center'}}>
+                  <div style={{flex:1}}>
+                    <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Hour</div>
+                    <ScrollWheel value={selHour} onChange={setSelHour} items={hours} height={180} />
+                  </div>
+                  <div style={{fontSize:'32px',fontFamily:'Cormorant Garamond,serif',color:'var(--a1)',padding:'0 8px',marginTop:'8px'}}>:</div>
+                  <div style={{flex:1}}>
+                    <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Min</div>
+                    <ScrollWheel value={selMin} onChange={setSelMin} items={mins} height={180} />
+                  </div>
                 </div>
-              </div>
+                </>
+              ) : (
+                <div style={{display:'flex',gap:'8px',alignItems:'center',padding:'16px 0'}}>
+                  <input type="number" min="0" max="23" value={String(selHour).padStart(2,'0')}
+                    onChange={e=>{const v=Math.min(23,Math.max(0,parseInt(e.target.value)||0));setSelHour(v);}}
+                    style={{flex:1,fontSize:'36px',fontFamily:'Cormorant Garamond,serif',textAlign:'center',
+                      background:'var(--w3)',border:'1px solid var(--w-line)',borderRadius:'8px',padding:'8px',
+                      color:'var(--ink)',outline:'none'}} autoFocus/>
+                  <div style={{fontSize:'32px',color:'var(--a1)',fontFamily:'Cormorant Garamond,serif'}}>:</div>
+                  <input type="number" min="0" max="59" value={String(selMin).padStart(2,'0')}
+                    onChange={e=>{const v=Math.min(59,Math.max(0,parseInt(e.target.value)||0));setSelMin(v);}}
+                    style={{flex:1,fontSize:'36px',fontFamily:'Cormorant Garamond,serif',textAlign:'center',
+                      background:'var(--w3)',border:'1px solid var(--w-line)',borderRadius:'8px',padding:'8px',
+                      color:'var(--ink)',outline:'none'}}/>
+                </div>
+                <div onClick={()=>setTimeMode('wheel')} style={{textAlign:'center',fontSize:'10px',color:'var(--ghost)',cursor:'pointer',marginTop:'4px',letterSpacing:'0.06em'}}>
+                  ↑ scroll to use wheel
+                </div>
+              )}
             </div>
           )}
 
@@ -255,6 +283,7 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
               boxShadow:selDate?'0 0 16px var(--a-glow)':'none',
             }}>Set Reminder</button>
           </div>
+        </div>
         </div>
       )}
     </div>
