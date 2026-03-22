@@ -998,3 +998,13 @@ async def debug_fire_reminders():
         "tasks": [{"id": t["id"], "title": t["title"]} for t in tasks],
         "push_subs": len(subs)
     }
+
+
+@app.delete("/push/subscriptions/{user_id}")
+async def clear_push_subscriptions(user_id: int):
+    """Clear all push subscriptions for a user so they can re-subscribe."""
+    from backend.database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("DELETE FROM push_subscriptions WHERE user_id = $1", user_id)
+    return {"ok": True, "message": "Subscriptions cleared"}
