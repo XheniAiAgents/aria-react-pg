@@ -108,8 +108,10 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   const dayEvents = calEvents[selectedDate] || [];
   const upcoming = [];
+  const past = [];
   Object.keys(calEvents).sort().forEach(ds => {
     if (ds > todayStr) calEvents[ds].forEach(e => upcoming.push({ ...e, dateStr: ds }));
+    else if (ds < todayStr) calEvents[ds].forEach(e => past.push({ ...e, dateStr: ds }));
   });
 
   const todayLabel = t ? t('today') : 'Today';
