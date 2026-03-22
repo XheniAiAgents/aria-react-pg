@@ -34,6 +34,7 @@ from backend.database import (
     get_events, get_events_month, add_event, delete_event, update_event,
     update_event_google_id, upsert_google_event, delete_events_not_in_google,
     get_pending_reminders, mark_reminder_sent,
+    update_user_timezone, get_user_timezone,
     get_task_reminders, clear_task_reminder,
     save_push_subscription, get_push_subscriptions,
     get_all_push_subscriptions_for_users, delete_push_subscription,
@@ -629,6 +630,25 @@ async def update_event_endpoint(event_id: int, req: EventUpdate):
 
 
 # ── Google OAuth / Gmail ──────────────────────────────────────────────────────
+
+@app.post("/user/timezone")
+async def set_user_timezone(user_id: int, timezone: str):
+    """Update user's timezone preference."""
+    # Validate timezone
+    import zoneinfo
+    try:
+        zoneinfo.ZoneInfo(timezone)
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Invalid timezone: {timezone}")
+    await update_user_timezone(user_id, timezone)
+    return {"status": "ok", "timezone": timezone}
+
+
+@app.get("/user/timezone")
+async def get_timezone(user_id: int):
+    tz = await get_user_timezone(user_id)
+    return {"timezone": tz}
+
 
 @app.get("/auth/google/start")
 async def google_auth_start(user_id: int):

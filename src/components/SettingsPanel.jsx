@@ -12,6 +12,7 @@ export default function SettingsPanel({
   onSaveDigest, onTestDigest, onConnectGmail, onDisconnectGmail,
   calendarConnected, calendarEmail, onConnectCalendar, onDisconnectCalendar,
   lang, onSetLang,
+  userTimezone, onSetTimezone,
   isMobile = false, t
 }) {
   const [chpwOpen, setChpwOpen] = useState(false);

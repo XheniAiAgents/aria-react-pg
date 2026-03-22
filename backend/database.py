@@ -51,6 +51,7 @@ async def init_db():
                 password_hash TEXT,
                 password_salt TEXT,
                 telegram_id   TEXT    UNIQUE,
+                timezone      TEXT    DEFAULT 'Europe/Madrid',
                 created_at    TIMESTAMPTZ DEFAULT NOW()
             )
         """)
@@ -167,6 +168,7 @@ async def init_db():
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_events_user_date ON events(user_id, event_date)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)")
+        await conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'Europe/Madrid'")
 
 
 # Keep for backward compatibility
@@ -790,6 +792,19 @@ async def delete_email_account(user_id: int):
         await conn.execute(
             "DELETE FROM email_accounts WHERE user_id = $1", user_id
         )
+
+
+async def update_user_timezone(user_id: int, timezone: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("UPDATE users SET timezone = $1 WHERE id = $2", timezone, user_id)
+
+
+async def get_user_timezone(user_id: int) -> str:
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT timezone FROM users WHERE id = $1", user_id)
+        return row["timezone"] if row and row["timezone"] else "Europe/Madrid"
 
 
 # ── Push subscriptions ────────────────────────────────────────────────────────
