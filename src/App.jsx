@@ -21,6 +21,10 @@ async function subscribeToPush(userId) {
 
     const reg = await navigator.serviceWorker.ready;
 
+    // Unsubscribe any existing subscription first (avoids key mismatch errors)
+    const existingSub = await reg.pushManager.getSubscription();
+    if (existingSub) await existingSub.unsubscribe();
+
     // Fetch VAPID public key from backend
     const res = await fetch(`${API}/push/vapid-public-key`);
     if (!res.ok) return;
