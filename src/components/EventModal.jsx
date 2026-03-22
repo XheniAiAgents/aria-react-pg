@@ -14,7 +14,7 @@ function utcTimeToLocal(dateStr, timeStr) {
   return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
-function CircularWheel({ items, value, onChange, height = 160 }) {
+function CircularWheel({ items, value, onChange, height = 160, onItemClick }) {
   const ref = useRef(null);
   const itemH = 40;
   const tripled = [...items, ...items, ...items];
@@ -57,6 +57,7 @@ function CircularWheel({ items, value, onChange, height = 160 }) {
             <div key={i} onClick={() => {
               onChange(realItem);
               if(ref.current) ref.current.scrollTop = (items.length + items.indexOf(realItem)) * itemH;
+              if(onItemClick) onItemClick();
             }} style={{
               height:itemH,display:'flex',alignItems:'center',justifyContent:'center',
               scrollSnapAlign:'center',cursor:'pointer',zIndex:3,position:'relative',
@@ -79,6 +80,16 @@ function TimePicker({ value, onChange, placeholder }) {
   const [m, setM] = useState(0);
   const [kbH, setKbH] = useState('09');
   const [kbM, setKbM] = useState('00');
+  const hourRef = useRef(null);
+  const minRef  = useRef(null);
+
+  function switchToKeyboard(field) {
+    setMode('keyboard');
+    setTimeout(() => {
+      if (field === 'hour' && hourRef.current) hourRef.current.focus();
+      if (field === 'min' && minRef.current) minRef.current.focus();
+    }, 50);
+  }
 
   const hours = Array.from({length:24},(_,i)=>i);
   const mins  = Array.from({length:60},(_,i)=>i);
@@ -140,9 +151,9 @@ function TimePicker({ value, onChange, placeholder }) {
 
           {mode === 'wheel' ? (
             <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
-              <CircularWheel items={hours} value={h} onChange={setH} />
+              <CircularWheel items={hours} value={h} onChange={setH} onItemClick={() => switchToKeyboard('hour')} />
               <div style={{ fontSize:'24px', color:'var(--a1)', fontFamily:'Cormorant Garamond,serif' }}>:</div>
-              <CircularWheel items={mins} value={m} onChange={setM} />
+              <CircularWheel items={mins} value={m} onChange={setM} onItemClick={() => switchToKeyboard('min')} />
             </div>
           ) : (
             <div style={{ display:'flex', gap:'8px', alignItems:'center', padding:'12px 0' }}>

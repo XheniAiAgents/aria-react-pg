@@ -554,7 +554,8 @@ async def get_pending_reminders() -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT e.*, u.telegram_id, u.id as user_id FROM events e
+            """SELECT e.id as event_id, e.title, e.event_date, e.event_time, e.reminder_minutes,
+               e.user_id, u.telegram_id FROM events e
                JOIN users u ON e.user_id = u.id
                WHERE e.reminded = 0
                AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz
