@@ -956,3 +956,35 @@ async def debug_tz():
                 '2026-03-22T00:19'::timestamptz <= NOW() as is_due
         """)
         return [dict(r) for r in rows]
+
+
+@app.get("/debug/fire-reminders")
+async def debug_fire_reminders():
+    """Manually trigger reminder check for debugging."""
+    from backend.database import get_pool
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT t.id, t.title, t.reminder_at,
+               t.reminder_at::timestamptz as reminder_ts,
+               NOW() as now,
+               t.reminder_at::timestamptz <= NOW() as is_due
+            FROM tasks t
+            JOIN users u ON t.user_id = u.id
+            WHERE t.done = 0
+            AND t.reminder_at IS NOT NULL
+        """)
+        results = [dict(r) for r in rows]
+    
+    # Also manually run the reminder fetch
+    from backend.database import get_task_reminders, get_all_push_subscriptions_for_users
+    tasks = await get_task_reminders()
+    user_ids = [t["user_id"] for t in tasks]
+    subs = await get_all_push_subscriptions_for_users(user_ids) if user_ids else []
+    
+    return {
+        "raw_tasks": results,
+        "reminder_query_found": len(tasks),
+        "tasks": [{"id": t["id"], "title": t["title"]} for t in tasks],
+        "push_subs": len(subs)
+    }
