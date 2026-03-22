@@ -557,9 +557,9 @@ async def get_pending_reminders() -> list:
             """SELECT e.*, u.telegram_id, u.id as user_id FROM events e
                JOIN users u ON e.user_id = u.id
                WHERE e.reminded = 0
-               AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz
-                   - (e.reminder_minutes || ' minutes')::interval <= NOW()
-               AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz >= NOW()"""
+               AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamp AT TIME ZONE 'Europe/Madrid'
+    - (e.reminder_minutes || ' minutes')::interval <= NOW()
+AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamp AT TIME ZONE 'Europe/Madrid' >= NOW()"""
         )
         return rows_to_list(rows)
 
