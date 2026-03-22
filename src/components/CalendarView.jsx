@@ -4,13 +4,6 @@ import EventModal from './EventModal';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOWS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-// Convert UTC HH:MM to local time for display
-function utcToLocal(dateStr, timeStr) {
-  if (!dateStr || !timeStr) return timeStr;
-  const d = new Date(`${dateStr}T${timeStr}:00Z`);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-
 export default function CalendarView({ API, userId, visible, showToast, onEventsChanged, t, googleConnected }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -114,10 +107,8 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   const dayEvents = calEvents[selectedDate] || [];
   const upcoming = [];
-  const past = [];
   Object.keys(calEvents).sort().forEach(ds => {
     if (ds > todayStr) calEvents[ds].forEach(e => upcoming.push({ ...e, dateStr: ds }));
-    else if (ds < todayStr) calEvents[ds].forEach(e => past.push({ ...e, dateStr: ds }));
   });
 
   const todayLabel = t ? t('today') : 'Today';
@@ -127,17 +118,13 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   function formatTimeRange(e) {
     if (!e.event_time) return '—';
-    const localTime = utcToLocal(e.event_date, e.event_time);
-    if (e.end_time) {
-      const localEnd = utcToLocal(e.event_date, e.end_time);
-      return `${localTime} – ${localEnd}`;
-    }
-    return localTime;
+    if (e.end_time) return `${e.event_time} – ${e.end_time}`;
+    return e.event_time;
   }
 
-  function renderEventItem(e, dateLabel, isPast = false) {
+  function renderEventItem(e, dateLabel) {
     return (
-      <div key={e.id} className="event-item" style={{ cursor: 'pointer', opacity: isPast ? 0.5 : 1 }} onClick={() => openEditModal(e)}>
+      <div key={e.id} className="event-item" style={{ cursor: 'pointer' }} onClick={() => openEditModal(e)}>
         <div className="event-time" style={dateLabel ? { minWidth: '60px', fontSize: '9px' } : {}}>
           {dateLabel && <div style={{ color: 'var(--a2)' }}>{dateLabel}</div>}
           <div>{formatTimeRange(e)}</div>
@@ -157,24 +144,27 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   return (
     <div id="calView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflowY: 'auto', padding: '24px 32px' }}>
       {/* Header */}
-      <div className="cal-header" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
-        {googleConnected ? (
-          <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
-            style={{ opacity: syncing ? 0.6 : 1, flexShrink: 0, padding: '8px 10px' }}>
-            {syncing ? '⟳' : '↻'} Sync
-          </button>
-        ) : <div style={{ flex: '0 0 50px' }} />}
-        <div className="cal-nav" style={{ flex: 1 }}>
+      <div className="cal-header">
+        <div className="cal-title">{MONTHS[month]} {year}</div>
+        <div className="cal-nav">
           <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
-          <span className="cal-month-label" style={{ fontSize: '13px' }}>{MONTHS[month]} {year}</span>
+          <span className="cal-month-label">{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         </div>
-        <button className="add-btn" onClick={openAddModal} style={{ flexShrink: 0, padding: '8px 10px' }}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          <span>{addEventLabel}</span>
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {googleConnected && (
+            <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
+              style={{ opacity: syncing ? 0.6 : 1 }}>
+              {syncing ? '⟳' : '🔄'} Sync
+            </button>
+          )}
+          <button className="add-btn" onClick={openAddModal}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            {addEventLabel}
+          </button>
+        </div>
       </div>
 
       {/* Grid */}
@@ -191,15 +181,12 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           const isToday = ds === todayStr;
           const isSelected = ds === selectedDate;
           const hasEvents = calEvents[ds];
-          const isPastDay = ds < todayStr;
           return (
             <div key={ds} className={`cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`} onClick={() => setSelectedDate(ds)}>
               <div className="cal-day-num">{d}</div>
               {hasEvents && (
                 <div className="cal-dots">
-                  {hasEvents.slice(0, 3).map((_, j) => (
-                    <div key={j} className="cal-dot" style={isPastDay ? { background: 'var(--ghost)' } : {}} />
-                  ))}
+                  {hasEvents.slice(0, 3).map((_, j) => <div key={j} className="cal-dot" />)}
                 </div>
               )}
             </div>
@@ -233,19 +220,6 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
             return renderEventItem(e, dateLabel);
           })}
       </div>
-
-      {/* Past events */}
-      {past.length > 0 && (
-        <div style={{ marginTop: '24px' }}>
-          <div className="cal-events-header">
-            <div className="cal-events-title" style={{ color: 'var(--ghost)' }}>Past — last 7 days</div>
-          </div>
-          {past.slice(-6).reverse().map((e) => {
-            const dateLabel = new Date(e.dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-            return renderEventItem(e, dateLabel, true);
-          })}
-        </div>
-      )}
 
       {/* Google Calendar hint */}
       {!googleConnected && (
