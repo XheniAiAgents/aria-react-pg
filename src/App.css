@@ -258,7 +258,11 @@ body::after {
 #calView::-webkit-scrollbar-thumb { background: var(--trace); }
 .cal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
 .cal-add-label { display: inline; }
-@media (max-width: 420px) { .cal-add-label { display: none; } }
+@media (max-width: 420px) {
+  .cal-add-label { display: none; }
+  .cal-header { gap: 4px !important; }
+  .add-btn { padding: 6px 8px !important; font-size: 11px !important; }
+}
 .cal-title { font-family: 'Cormorant Garamond', serif; font-size: 28px; font-weight: 300; color: var(--ink); flex: 1; }
 .cal-nav { display: flex; align-items: center; gap: 8px; }
 .cal-nav-btn { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--trace); background: transparent; color: var(--mist); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
