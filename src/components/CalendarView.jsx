@@ -4,6 +4,13 @@ import EventModal from './EventModal';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOWS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
+// Convert UTC HH:MM to local time for display
+function utcToLocal(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return timeStr;
+  const d = new Date(`${dateStr}T${timeStr}:00Z`);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
 export default function CalendarView({ API, userId, visible, showToast, onEventsChanged, t, googleConnected }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -118,8 +125,12 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   function formatTimeRange(e) {
     if (!e.event_time) return '—';
-    if (e.end_time) return `${e.event_time} – ${e.end_time}`;
-    return e.event_time;
+    const localTime = utcToLocal(e.event_date, e.event_time);
+    if (e.end_time) {
+      const localEnd = utcToLocal(e.event_date, e.end_time);
+      return `${localTime} – ${localEnd}`;
+    }
+    return localTime;
   }
 
   function renderEventItem(e, dateLabel) {
@@ -144,9 +155,8 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   return (
     <div id="calView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflowY: 'auto', padding: '24px 32px' }}>
       {/* Header */}
-      <div className="cal-header">
-        <div className="cal-title">{MONTHS[month]} {year}</div>
-        <div className="cal-nav">
+      <div className="cal-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <div className="cal-nav" style={{ flex: 1 }}>
           <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
           <span className="cal-month-label">{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
@@ -155,7 +165,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           {googleConnected && (
             <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
               style={{ opacity: syncing ? 0.6 : 1 }}>
-              {syncing ? '⟳' : '🔄'} Sync
+              {syncing ? '⟳' : '↻'} Sync
             </button>
           )}
           <button className="add-btn" onClick={openAddModal}>
