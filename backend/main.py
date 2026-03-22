@@ -68,12 +68,20 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 async def send_web_push(subscription: dict, title: str, body: str):
     """Send a Web Push notification to a single subscription."""
     try:
-        import json
+        import json, base64, re
         from pywebpush import webpush, WebPushException
         vapid_private = os.getenv("VAPID_PRIVATE_KEY", "")
         vapid_email   = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:aria@example.com")
         if not vapid_private:
             return
+        # If key is PEM format, convert to raw base64url for pywebpush
+        if "BEGIN" in vapid_private:
+            from cryptography.hazmat.primitives.serialization import load_pem_private_key, Encoding, PrivateFormat, NoEncryption
+            pem_str = vapid_private.replace("\\n", "\n")
+            pem = pem_str.encode()
+            privkey = load_pem_private_key(pem, password=None)
+            raw = privkey.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
+            vapid_private = base64.urlsafe_b64encode(raw).decode().rstrip("=")
         endpoint_short = subscription["endpoint"][:60]
         print(f"[push] sending to {endpoint_short}...")
         webpush(
