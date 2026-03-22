@@ -472,7 +472,7 @@ async def upsert_google_event(user_id: int, google_id: str, title: str,
         if existing:
             await conn.execute(
                 """UPDATE events SET title=$1, event_date=$2, event_time=$3, end_time=$4,
-                   description=$5, reminded=0 WHERE id=$6""",
+                   description=$5 WHERE id=$6""",
                 title, event_date, event_time, end_time, description, existing["id"]
             )
             return existing["id"]
