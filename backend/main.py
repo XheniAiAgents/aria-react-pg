@@ -68,6 +68,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 async def send_web_push(subscription: dict, title: str, body: str):
     """Send a Web Push notification to a single subscription."""
     try:
+        import json
         from pywebpush import webpush, WebPushException
         vapid_private = os.getenv("VAPID_PRIVATE_KEY", "")
         vapid_email   = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:aria@example.com")
