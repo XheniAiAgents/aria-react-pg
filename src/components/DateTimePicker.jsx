@@ -134,7 +134,8 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
 
       {open && (
         <div style={{
-          position:'absolute', top:'calc(100% + 6px)', left:0, right:0,
+          position:'absolute', top:'calc(100% + 6px)', left:0,
+          width:'100%', maxWidth:'340px',
           background:'var(--surface)', border:'1px solid var(--w-line)',
           borderRadius:'14px', padding:'16px', zIndex:999,
           boxShadow:'0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px var(--trace)',
