@@ -123,9 +123,9 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     return e.event_time;
   }
 
-  function renderEventItem(e, dateLabel) {
+  function renderEventItem(e, dateLabel, isPast = false) {
     return (
-      <div key={e.id} className="event-item" style={{ cursor: 'pointer' }} onClick={() => openEditModal(e)}>
+      <div key={e.id} className="event-item" style={{ cursor: 'pointer', opacity: isPast ? 0.5 : 1 }} onClick={() => openEditModal(e)}>
         <div className="event-time" style={dateLabel ? { minWidth: '60px', fontSize: '9px' } : {}}>
           {dateLabel && <div style={{ color: 'var(--a2)' }}>{dateLabel}</div>}
           <div>{formatTimeRange(e)}</div>
@@ -218,6 +218,19 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
             return renderEventItem(e, dateLabel);
           })}
       </div>
+
+      {/* Past events */}
+      {past.length > 0 && (
+        <div style={{ marginTop: '24px' }}>
+          <div className="cal-events-header">
+            <div className="cal-events-title" style={{ color: 'var(--ghost)' }}>Past — last 7 days</div>
+          </div>
+          {past.slice(-6).reverse().map((e) => {
+            const dateLabel = new Date(e.dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+            return renderEventItem(e, dateLabel, true);
+          })}
+        </div>
+      )}
 
       {/* Google Calendar hint */}
       {!googleConnected && (

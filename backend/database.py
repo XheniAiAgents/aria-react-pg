@@ -845,11 +845,11 @@ async def delete_push_subscription(endpoint: str):
 async def cleanup_old_data():
     pool = await get_pool()
     async with pool.acquire() as conn:
-        # Delete past events (more than 1 hour ago)
+        # Delete past events older than 7 days
         await conn.execute("""
             DELETE FROM events
-            WHERE (event_date || ' ' || COALESCE(event_time, '23:59'))::timestamptz
-                  < NOW() - INTERVAL '1 hour'
+            WHERE (event_date || ' ' || COALESCE(event_time, '23:59'))::timestamp AT TIME ZONE 'Europe/Madrid'
+                  < NOW() - INTERVAL '7 days'
         """)
         # Delete completed tasks older than 3 days
         await conn.execute("""
