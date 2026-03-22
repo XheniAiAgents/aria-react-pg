@@ -7,16 +7,19 @@ function ScrollWheel({ items, value, onChange, height = 180, onItemClick }) {
   const ref = useRef(null);
   const itemH = 44;
   const tripled = [...items, ...items, ...items];
+  const isProgrammaticScroll = useRef(false);
 
   useEffect(() => {
     const idx = items.indexOf(value);
     if (ref.current && idx >= 0) {
+      isProgrammaticScroll.current = true;
       ref.current.scrollTop = (items.length + idx) * itemH;
+      setTimeout(() => { isProgrammaticScroll.current = false; }, 100);
     }
   }, [value]);
 
   function handleScroll() {
-    if (!ref.current) return;
+    if (!ref.current || isProgrammaticScroll.current) return;
     const scrollTop = ref.current.scrollTop;
     const idx = Math.round(scrollTop / itemH);
     if (idx < items.length * 0.5) { ref.current.scrollTop = scrollTop + items.length * itemH; return; }
@@ -35,7 +38,7 @@ function ScrollWheel({ items, value, onChange, height = 180, onItemClick }) {
           const item = items[i % items.length];
           const isSelected = item === value;
           return (
-            <div key={i} onClick={() => { onChange(item); if(ref.current) ref.current.scrollTop = (items.length + items.indexOf(item)) * itemH; if(onItemClick) onItemClick(item); }}
+            <div key={i} onClick={() => { if(onItemClick) { onItemClick(item); } else { onChange(item); } if(ref.current) { isProgrammaticScroll.current = true; ref.current.scrollTop = (items.length + items.indexOf(item)) * itemH; setTimeout(() => { isProgrammaticScroll.current = false; }, 100); } }}
               style={{ height:itemH,display:'flex',alignItems:'center',justifyContent:'center',scrollSnapAlign:'center',cursor:'pointer',position:'relative',zIndex:3,
                 fontSize:isSelected?'28px':'18px',fontFamily:'Cormorant Garamond,serif',fontWeight:isSelected?400:300,
                 color:isSelected?'var(--ink)':'var(--ghost)',transition:'all 0.15s',letterSpacing:'-0.01em' }}>

@@ -151,22 +151,11 @@ async def init_db():
                 calendar_email TEXT NOT NULL
             )
         """)
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS push_subscriptions (
-                id         SERIAL PRIMARY KEY,
-                user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                endpoint   TEXT    NOT NULL UNIQUE,
-                p256dh     TEXT    NOT NULL,
-                auth       TEXT    NOT NULL,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
         # Create indexes for performance
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_mode ON conversations(user_id, mode, created_at)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_user ON tasks(user_id, done)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_events_user_date ON events(user_id, event_date)")
         await conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id)")
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)")
 
 
 # Keep for backward compatibility
@@ -407,10 +396,11 @@ async def get_task_reminders() -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT t.*, u.telegram_id, u.id as user_id FROM tasks t
+            """SELECT t.*, u.telegram_id FROM tasks t
                JOIN users u ON t.user_id = u.id
                WHERE t.done = 0
                AND t.reminder_at IS NOT NULL
+               AND u.telegram_id IS NOT NULL
                AND t.reminder_at::timestamptz <= NOW()""",
         )
         return rows_to_list(rows)
@@ -472,7 +462,7 @@ async def upsert_google_event(user_id: int, google_id: str, title: str,
         if existing:
             await conn.execute(
                 """UPDATE events SET title=$1, event_date=$2, event_time=$3, end_time=$4,
-                   description=$5, reminded=0 WHERE id=$6""",
+                   description=$5 WHERE id=$6""",
                 title, event_date, event_time, end_time, description, existing["id"]
             )
             return existing["id"]
@@ -554,10 +544,10 @@ async def get_pending_reminders() -> list:
     pool = await get_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT e.id as event_id, e.title, e.event_date, e.event_time, e.reminder_minutes,
-               e.user_id, u.telegram_id FROM events e
+            """SELECT e.*, u.telegram_id FROM events e
                JOIN users u ON e.user_id = u.id
                WHERE e.reminded = 0
+               AND u.telegram_id IS NOT NULL
                AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz
                    - (e.reminder_minutes || ' minutes')::interval <= NOW()
                AND (e.event_date || ' ' || COALESCE(e.event_time, '00:00'))::timestamptz >= NOW()"""
@@ -793,64 +783,16 @@ async def delete_email_account(user_id: int):
         )
 
 
-# ── Push subscriptions ────────────────────────────────────────────────────────
-
-async def save_push_subscription(user_id: int, endpoint: str, p256dh: str, auth: str):
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            """INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT(endpoint) DO UPDATE SET
-                 user_id=EXCLUDED.user_id,
-                 p256dh=EXCLUDED.p256dh,
-                 auth=EXCLUDED.auth""",
-            user_id, endpoint, p256dh, auth
-        )
-
-
-async def get_push_subscriptions(user_id: int) -> list:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
-            user_id
-        )
-        return rows_to_list(rows)
-
-
-async def get_all_push_subscriptions_for_users(user_ids: list[int]) -> list:
-    """Get all push subscriptions for a list of user IDs (used by reminder loop)."""
-    if not user_ids:
-        return []
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT user_id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1::int[])",
-            user_ids
-        )
-        return rows_to_list(rows)
-
-
-async def delete_push_subscription(endpoint: str):
-    """Remove a subscription (e.g. when the browser rejects it as expired)."""
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "DELETE FROM push_subscriptions WHERE endpoint = $1", endpoint
-        )
-
-
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 async def cleanup_old_data():
     pool = await get_pool()
     async with pool.acquire() as conn:
-        # Delete past events older than 7 days
+        # Delete past events (more than 1 hour ago)
         await conn.execute("""
             DELETE FROM events
             WHERE (event_date || ' ' || COALESCE(event_time, '23:59'))::timestamptz
-                  < NOW() - INTERVAL '7 days'
+                  < NOW() - INTERVAL '1 hour'
         """)
         # Delete completed tasks older than 3 days
         await conn.execute("""
