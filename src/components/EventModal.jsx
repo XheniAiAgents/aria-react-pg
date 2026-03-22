@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 
-// Convert local HH:MM to UTC HH:MM for backend storage
-function localTimeToUTC(dateStr, timeStr) {
-  if (!dateStr || !timeStr) return timeStr;
-  const d = new Date(`${dateStr}T${timeStr}:00`);
-  return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
-}
-
 function CircularWheel({ items, value, onChange, height = 160, onItemClick }) {
   const ref = useRef(null);
   const itemH = 40;
@@ -206,7 +199,14 @@ export default function EventModal({ API, userId, selectedDate, open, onClose, o
     const picked = new Date(date + 'T00:00:00');
     if (picked < today) { showToast('Date cannot be in the past.', true); return; }
     if (time && endTime && endTime <= time) { showToast('End time must be after start time.', true); return; }
-    const body = { user_id: userId, title, event_date: date, event_time: time || null, end_time: endTime || null, description: desc || null, reminder_minutes: parseInt(remind) || 15 };
+    const body = {
+      user_id: userId, title,
+      event_date: date,
+      event_time: time || null,
+      end_time: endTime || null,
+      description: desc || null,
+      reminder_minutes: parseInt(remind) || 15
+    };
     if (isEdit) {
       await fetch(`${API}/events/${editEvent.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       onClose(); onEdited && onEdited(); showToast('Event updated.');
