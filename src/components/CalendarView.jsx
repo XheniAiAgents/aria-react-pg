@@ -135,9 +135,9 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     return localTime;
   }
 
-  function renderEventItem(e, dateLabel) {
+  function renderEventItem(e, dateLabel, isPast = false) {
     return (
-      <div key={e.id} className="event-item" style={{ cursor: 'pointer' }} onClick={() => openEditModal(e)}>
+      <div key={e.id} className="event-item" style={{ cursor: 'pointer', opacity: isPast ? 0.5 : 1 }} onClick={() => openEditModal(e)}>
         <div className="event-time" style={dateLabel ? { minWidth: '60px', fontSize: '9px' } : {}}>
           {dateLabel && <div style={{ color: 'var(--a2)' }}>{dateLabel}</div>}
           <div>{formatTimeRange(e)}</div>
@@ -191,12 +191,15 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           const isToday = ds === todayStr;
           const isSelected = ds === selectedDate;
           const hasEvents = calEvents[ds];
+          const isPastDay = ds < todayStr;
           return (
             <div key={ds} className={`cal-day${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`} onClick={() => setSelectedDate(ds)}>
               <div className="cal-day-num">{d}</div>
               {hasEvents && (
                 <div className="cal-dots">
-                  {hasEvents.slice(0, 3).map((_, j) => <div key={j} className="cal-dot" />)}
+                  {hasEvents.slice(0, 3).map((_, j) => (
+                    <div key={j} className="cal-dot" style={isPastDay ? { background: 'var(--ghost)' } : {}} />
+                  ))}
                 </div>
               )}
             </div>
@@ -239,7 +242,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
           </div>
           {past.slice(-6).reverse().map((e) => {
             const dateLabel = new Date(e.dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-            return renderEventItem(e, dateLabel);
+            return renderEventItem(e, dateLabel, true);
           })}
         </div>
       )}

@@ -35,7 +35,7 @@ function ScrollWheel({ items, value, onChange, height = 180, onItemClick }) {
           const item = items[i % items.length];
           const isSelected = item === value;
           return (
-            <div key={i} onClick={() => { onChange(item); if(ref.current) ref.current.scrollTop = (items.length + items.indexOf(item)) * itemH; if(onItemClick) onItemClick(); }}
+            <div key={i} onClick={() => { onChange(item); if(ref.current) ref.current.scrollTop = (items.length + items.indexOf(item)) * itemH; if(onItemClick) onItemClick(item); }}
               style={{ height:itemH,display:'flex',alignItems:'center',justifyContent:'center',scrollSnapAlign:'center',cursor:'pointer',position:'relative',zIndex:3,
                 fontSize:isSelected?'28px':'18px',fontFamily:'Cormorant Garamond,serif',fontWeight:isSelected?400:300,
                 color:isSelected?'var(--ink)':'var(--ghost)',transition:'all 0.15s',letterSpacing:'-0.01em' }}>
@@ -64,7 +64,9 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
   const hourInputRef = useRef(null);
   const minInputRef  = useRef(null);
 
-  function switchToKeyboard(field) {
+  function switchToKeyboard(field, val) {
+    if (field === 'hour' && val !== undefined) setSelHour(val);
+    if (field === 'min' && val !== undefined) setSelMin(val);
     setTimeMode('keyboard');
     setTimeout(() => {
       if (field === 'hour' && hourInputRef.current) hourInputRef.current.focus();
@@ -215,12 +217,12 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
                 <div style={{display:'flex',gap:'0',alignItems:'center',justifyContent:'center'}}>
                   <div style={{flex:1}}>
                     <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Hour</div>
-                    <ScrollWheel items={hours} value={selHour} onChange={setSelHour} height={180} onItemClick={() => switchToKeyboard('hour')} />
+                    <ScrollWheel items={hours} value={selHour} onChange={setSelHour} height={180} onItemClick={(v) => switchToKeyboard('hour', v)} />
                   </div>
                   <div style={{fontSize:'32px',fontFamily:'Cormorant Garamond,serif',color:'var(--a1)',padding:'0 8px',marginTop:'8px'}}>:</div>
                   <div style={{flex:1}}>
                     <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Min</div>
-                    <ScrollWheel items={mins} value={selMin} onChange={setSelMin} height={180} onItemClick={() => switchToKeyboard('min')} />
+                    <ScrollWheel items={mins} value={selMin} onChange={setSelMin} height={180} onItemClick={(v) => switchToKeyboard('min', v)} />
                   </div>
                 </div>
               ) : (
