@@ -1,10 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { fmtDatetime } from '../utils/helpers';
 
-// Convert datetime-local value (local time) to UTC ISO string for backend
-function toUTC(localDatetime) {
-  if (!localDatetime) return null;
-  return new Date(localDatetime).toISOString();
+// Combine separate date + time inputs into UTC ISO string for backend
+function toUTC(date, time) {
+  if (!date || !time) return null;
+  return new Date(`${date}T${time}`).toISOString();
+}
+
+// Split a stored reminder_at back into date and time for display in inputs
+function splitReminder(reminder_at) {
+  if (!reminder_at) return { date: '', time: '' };
+  const d = new Date(reminder_at);
+  if (isNaN(d)) return { date: '', time: '' };
+  const date = d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+  const time = d.toTimeString().slice(0, 5);   // HH:MM
+  return { date, time };
 }
 
 export default function TasksView({ API, userId, visible, showToast, t }) {
@@ -12,13 +22,15 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
   const [completed, setCompleted] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [newReminder, setNewReminder] = useState('');
+  const [newReminderDate, setNewReminderDate] = useState('');
+  const [newReminderTime, setNewReminderTime] = useState('');
   const [doneCbs, setDoneCbs] = useState({});
 
   // Edit state
   const [editId, setEditId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
-  const [editReminder, setEditReminder] = useState('');
+  const [editReminderDate, setEditReminderDate] = useState('');
+  const [editReminderTime, setEditReminderTime] = useState('');
 
   // Long-press
   const longPressTimer = useRef(null);
@@ -43,10 +55,10 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
     try {
       const res = await fetch(`${API}/tasks`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: newTitle, reminder_at: toUTC(newReminder) })
+        body: JSON.stringify({ user_id: userId, title: newTitle, reminder_at: toUTC(newReminderDate, newReminderTime) })
       });
       if (!res.ok) { const e = await res.json(); throw new Error(JSON.stringify(e)); }
-      setNewTitle(''); setNewReminder(''); setAddOpen(false);
+      setNewTitle(''); setNewReminderDate(''); setNewReminderTime(''); setAddOpen(false);
       await loadTasks();
       showToast('Task added.');
     } catch (e) { showToast('Error: ' + e.message, true); }
@@ -66,13 +78,16 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
   function openEdit(task) {
     setEditId(task.id);
     setEditTitle(task.title);
-    setEditReminder(task.reminder_at ? task.reminder_at.replace(' ', 'T').slice(0, 16) : '');
+    const { date, time } = splitReminder(task.reminder_at);
+    setEditReminderDate(date);
+    setEditReminderTime(time);
   }
 
   function cancelEdit() {
     setEditId(null);
     setEditTitle('');
-    setEditReminder('');
+    setEditReminderDate('');
+    setEditReminderTime('');
   }
 
   async function saveEdit() {
@@ -80,7 +95,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
     try {
       await fetch(`${API}/tasks/${editId}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: editTitle, reminder_at: toUTC(editReminder) })
+        body: JSON.stringify({ user_id: userId, title: editTitle, reminder_at: toUTC(editReminderDate, editReminderTime) })
       });
       cancelEdit();
       await loadTasks();
@@ -108,8 +123,12 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
               onChange={e => setEditTitle(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && saveEdit()}
               autoFocus />
-            <input className="form-input" type="datetime-local" style={{ colorScheme: 'dark' }}
-              value={editReminder} onChange={e => setEditReminder(e.target.value)} />
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input className="form-input" type="date" style={{ flex: 1 }}
+                value={editReminderDate} onChange={e => setEditReminderDate(e.target.value)} />
+              <input className="form-input" type="time" style={{ flex: 1 }}
+                value={editReminderTime} onChange={e => setEditReminderTime(e.target.value)} />
+            </div>
           </div>
           <div className="form-actions">
             <button className="btn-ghost" onClick={cancelEdit}>Cancel</button>
@@ -164,11 +183,15 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
           <input className="form-input" placeholder={t('addTask') + '…'} value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitTask()} />
-          <input className="form-input" type="datetime-local" style={{ colorScheme: 'dark' }}
-            value={newReminder} onChange={e => setNewReminder(e.target.value)} />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input className="form-input" type="date" style={{ flex: 1 }}
+              value={newReminderDate} onChange={e => setNewReminderDate(e.target.value)} />
+            <input className="form-input" type="time" style={{ flex: 1 }}
+              value={newReminderTime} onChange={e => setNewReminderTime(e.target.value)} />
+          </div>
         </div>
         <div className="form-actions">
-          <button className="btn-ghost" onClick={() => { setAddOpen(false); setNewTitle(''); setNewReminder(''); }}>Cancel</button>
+          <button className="btn-ghost" onClick={() => { setAddOpen(false); setNewTitle(''); setNewReminderDate(''); setNewReminderTime(''); }}>Cancel</button>
           <button className="btn-primary" onClick={submitTask}>Add</button>
         </div>
       </div>
