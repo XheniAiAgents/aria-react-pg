@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Mo','Tu','We','Th','Fr','Sa','Su'];
 
-function ScrollWheel({ items, value, onChange, height = 180 }) {
+function ScrollWheel({ items, value, onChange, height = 180, onItemClick }) {
   const ref = useRef(null);
   const itemH = 44;
   const tripled = [...items, ...items, ...items];
@@ -35,7 +35,7 @@ function ScrollWheel({ items, value, onChange, height = 180 }) {
           const item = items[i % items.length];
           const isSelected = item === value;
           return (
-            <div key={i} onClick={() => { onChange(item); if(ref.current) ref.current.scrollTop = (items.length + items.indexOf(item)) * itemH; }}
+            <div key={i} onClick={() => { onChange(item); if(ref.current) ref.current.scrollTop = (items.length + items.indexOf(item)) * itemH; if(onItemClick) onItemClick(item); }}
               style={{ height:itemH,display:'flex',alignItems:'center',justifyContent:'center',scrollSnapAlign:'center',cursor:'pointer',position:'relative',zIndex:3,
                 fontSize:isSelected?'28px':'18px',fontFamily:'Cormorant Garamond,serif',fontWeight:isSelected?400:300,
                 color:isSelected?'var(--ink)':'var(--ghost)',transition:'all 0.15s',letterSpacing:'-0.01em' }}>
@@ -61,6 +61,8 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
 
   const hours = Array.from({length:24},(_,i)=>i);
   const mins  = Array.from({length:60},(_,i)=>i);
+  const hourInputRef = useRef(null);
+  const minInputRef  = useRef(null);
 
   useEffect(() => {
     if (value) {
@@ -100,6 +102,16 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
   function clear() {
     onChange(null); setSelDate(null); setSelHour(9); setSelMin(0);
     setOpen(false); setView('date'); setTimeMode('wheel');
+  }
+
+  function switchToKeyboard(field, val) {
+    if (field === 'hour' && val !== undefined) setSelHour(val);
+    if (field === 'min' && val !== undefined) setSelMin(val);
+    setTimeMode('keyboard');
+    setTimeout(() => {
+      if (field === 'hour' && hourInputRef.current) hourInputRef.current.focus();
+      if (field === 'min' && minInputRef.current) minInputRef.current.focus();
+    }, 50);
   }
 
   function formatDisplay() {
@@ -206,12 +218,12 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
                 <div style={{display:'flex',gap:'0',alignItems:'center',justifyContent:'center'}}>
                   <div style={{flex:1}}>
                     <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Hour</div>
-                    <ScrollWheel items={hours} value={selHour} onChange={setSelHour} height={180} />
+                    <ScrollWheel items={hours} value={selHour} onChange={setSelHour} height={180} onItemClick={(v) => switchToKeyboard('hour', v)} />
                   </div>
                   <div style={{fontSize:'32px',fontFamily:'Cormorant Garamond,serif',color:'var(--a1)',padding:'0 8px',marginTop:'8px'}}>:</div>
                   <div style={{flex:1}}>
                     <div style={{textAlign:'center',fontSize:'9px',color:'var(--ghost)',textTransform:'uppercase',letterSpacing:'0.1em',marginBottom:'4px'}}>Min</div>
-                    <ScrollWheel items={mins} value={selMin} onChange={setSelMin} height={180} />
+                    <ScrollWheel items={mins} value={selMin} onChange={setSelMin} height={180} onItemClick={(v) => switchToKeyboard('min', v)} />
                   </div>
                 </div>
               ) : (
@@ -220,13 +232,13 @@ export default function DateTimePicker({ value, onChange, placeholder = 'Set rem
                     onChange={e => { const v=Math.min(23,Math.max(0,parseInt(e.target.value)||0)); setSelHour(v); }}
                     style={{flex:1,fontSize:'36px',fontFamily:'Cormorant Garamond,serif',textAlign:'center',
                       background:'var(--w3)',border:'1px solid var(--w-line)',borderRadius:'8px',padding:'8px',
-                      color:'var(--ink)',outline:'none'}} autoFocus />
+                      color:'var(--ink)',outline:'none'}} ref={hourInputRef} autoFocus />
                   <div style={{fontSize:'32px',color:'var(--a1)',fontFamily:'Cormorant Garamond,serif'}}>:</div>
                   <input type="number" min="0" max="59" value={String(selMin).padStart(2,'0')}
                     onChange={e => { const v=Math.min(59,Math.max(0,parseInt(e.target.value)||0)); setSelMin(v); }}
                     style={{flex:1,fontSize:'36px',fontFamily:'Cormorant Garamond,serif',textAlign:'center',
                       background:'var(--w3)',border:'1px solid var(--w-line)',borderRadius:'8px',padding:'8px',
-                      color:'var(--ink)',outline:'none'}} />
+                      color:'var(--ink)',outline:'none'}} ref={minInputRef} />
                 </div>
               )}
             </div>
