@@ -197,7 +197,7 @@ async def reminder_loop():
                 print(f"[reminder] sending to {len(subs)} push sub(s)")
                 for sub in subs:
                     await send_web_push(sub, title, body)
-                await mark_reminder_sent(event["id"])
+                await mark_reminder_sent(event["event_id"])
 
             for task in pending_tasks:
                 title = f"🔔 {task['title']}"
