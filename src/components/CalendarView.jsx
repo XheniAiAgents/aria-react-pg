@@ -1,8 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import EventModal from './EventModal';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DOWS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// Convert UTC HH:MM to local time for display
+function utcToLocal(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return timeStr;
+  const d = new Date(`${dateStr}T${timeStr}:00Z`);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
 
 export default function CalendarView({ API, userId, visible, showToast, onEventsChanged, t, googleConnected }) {
   const now = new Date();
@@ -27,15 +34,8 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     } catch {}
   }, [API, userId, year, month]);
 
-  const lastSyncRef = useRef(0);
   const syncGoogleCalendar = useCallback(async (silent = false) => {
     if (!googleConnected) return;
-    // Cooldown: don't sync more than once per 60 seconds silently
-    if (silent) {
-      const now = Date.now();
-      if (now - lastSyncRef.current < 60000) return;
-      lastSyncRef.current = now;
-    }
     setSyncing(true);
     try {
       const res = await fetch(`${API}/calendar/sync/${userId}`, { method: 'POST' });
@@ -125,8 +125,12 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   function formatTimeRange(e) {
     if (!e.event_time) return '—';
-    if (e.end_time) return `${e.event_time} – ${e.end_time}`;
-    return e.event_time;
+    const localTime = utcToLocal(e.event_date, e.event_time);
+    if (e.end_time) {
+      const localEnd = utcToLocal(e.event_date, e.end_time);
+      return `${localTime} – ${localEnd}`;
+    }
+    return localTime;
   }
 
   function renderEventItem(e, dateLabel) {
@@ -151,27 +155,24 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   return (
     <div id="calView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflowY: 'auto', padding: '24px 32px' }}>
       {/* Header */}
-      <div className="cal-header">
-        <div className="cal-title">{MONTHS[month]} {year}</div>
-        <div className="cal-nav">
+      <div className="cal-header" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        {googleConnected ? (
+          <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
+            style={{ opacity: syncing ? 0.6 : 1, flexShrink: 0 }}>
+            {syncing ? '⟳' : '↻'} Sync
+          </button>
+        ) : <div style={{ flex: '0 0 60px' }} />}
+        <div className="cal-nav" style={{ flex: 1, justifyContent: 'center' }}>
           <button className="cal-nav-btn" onClick={prevMonth}>‹</button>
           <span className="cal-month-label">{MONTHS[month]} {year}</span>
           <button className="cal-nav-btn" onClick={nextMonth}>›</button>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {googleConnected && (
-            <button className="add-btn" onClick={() => syncGoogleCalendar(false)} disabled={syncing}
-              style={{ opacity: syncing ? 0.6 : 1 }}>
-              {syncing ? '⟳' : '🔄'} Sync
-            </button>
-          )}
-          <button className="add-btn" onClick={openAddModal}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            {addEventLabel}
-          </button>
-        </div>
+        <button className="add-btn" onClick={openAddModal} style={{ flexShrink: 0 }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          {addEventLabel}
+        </button>
       </div>
 
       {/* Grid */}
