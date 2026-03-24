@@ -59,7 +59,10 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
         const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
         mediaRecorderRef.current = recorder;
         chunksRef.current = [];
-        recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+        recorder.ondataavailable = e => {
+          console.log('[voice] chunk:', e.data.size, 'bytes'); // debug — remove after fixing
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
         recorder.start(100);
         isRecordingRef.current = true;
         setIsRecording(true);
@@ -78,8 +81,13 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     setIsProcessing(true);
 
     await new Promise(resolve => {
-      mediaRecorderRef.current.onstop = resolve;
-      mediaRecorderRef.current.stop();
+      const recorder = mediaRecorderRef.current;
+      recorder.onstop = resolve;
+      // FIX 3: iOS Safari doesn't flush the last chunk automatically on stop().
+      // requestData() forces a final dataavailable event, then we wait 150ms
+      // for it to fire before calling stop().
+      recorder.requestData();
+      setTimeout(() => recorder.stop(), 150);
     });
 
     streamRef.current?.getTracks().forEach(t => t.stop());
