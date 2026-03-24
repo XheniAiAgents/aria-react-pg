@@ -8,4 +8,4 @@ venv/
 .DS_Store
 vapid_private.pem
 vapid_public.pem
-backend/__pycache__/
+**/__pycache__/
