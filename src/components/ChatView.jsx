@@ -15,6 +15,9 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
   const doSendRef = useRef(null);
 
+  // Keep ref updated on every render so onTranscript always calls the latest version
+  useEffect(() => { doSendRef.current = doSend; });
+
   const voice = useVoice({
     API,
     lang,
@@ -140,7 +143,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   // ── SEND ─────────────────────────────────────────────────────────────────
 
   async function doSend(text) {
-    doSendRef.current = doSend;
     if ((!text.trim() && !attachedFile) || isThinking) return;
     const currentFile = attachedFile;
     setAttachedFile(null);
