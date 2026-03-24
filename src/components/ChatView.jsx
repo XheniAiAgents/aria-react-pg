@@ -13,16 +13,21 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   const fileInputRef = useRef(null);
   const initializedRef = useRef(false);
 
+  const doSendRef = useRef(null);
+
   const voice = useVoice({
     API,
     lang,
     onTranscript: (text) => {
-      setInput(text);
-      // Auto-send after voice transcription
-      setTimeout(() => doSend(text), 100);
+      setInput('');
+      if (textareaRef.current) {
+        textareaRef.current.value = '';
+        textareaRef.current.style.height = 'auto';
+      }
+      // Use ref to always call the latest doSend, avoiding stale closure
+      setTimeout(() => doSendRef.current?.(text), 100);
     },
     onError: (msg) => {
-      // Show brief error in chat
       setMessages(msgs => [...msgs, { type: 'aria', text: `⚠️ ${msg}`, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
     },
   });
@@ -135,6 +140,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   // ── SEND ─────────────────────────────────────────────────────────────────
 
   async function doSend(text) {
+    doSendRef.current = doSend;
     if ((!text.trim() && !attachedFile) || isThinking) return;
     const currentFile = attachedFile;
     setAttachedFile(null);
