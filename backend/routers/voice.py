@@ -27,10 +27,6 @@ async def transcribe(
     audio: UploadFile = File(...),
     lang: str = Form("en"),
 ):
-    """
-    Receive audio blob, return transcribed text via Groq Whisper.
-    Supports any language — pass lang hint for better accuracy.
-    """
     try:
         audio_bytes = await audio.read()
         if not audio_bytes:
@@ -38,10 +34,8 @@ async def transcribe(
 
         client = get_groq_client()
 
-        # Map lang code to Whisper language hint (optional but improves accuracy)
         lang_hint = lang if lang != "auto" else None
 
-        # Groq expects a file-like with a name so it can detect format
         filename = audio.filename or "recording.webm"
 
         # Derive content_type from filename if browser didn't send one.
@@ -56,6 +50,9 @@ async def transcribe(
         else:
             content_type = "audio/webm"
 
+        # DEBUG — visible in Railway logs
+        print(f"[transcribe] filename={filename!r} | content_type={content_type!r} | size={len(audio_bytes)}b | lang={lang_hint!r}")
+
         transcription = client.audio.transcriptions.create(
             model="whisper-large-v3-turbo",
             file=(filename, audio_bytes, content_type),
@@ -63,8 +60,8 @@ async def transcribe(
             response_format="text",
         )
 
-        # transcription is a plain string when response_format="text"
         text = transcription if isinstance(transcription, str) else transcription.text
+        print(f"[transcribe] result={text!r}")
         return {"text": text.strip()}
 
     except HTTPException:
@@ -78,33 +75,27 @@ async def transcribe(
 
 class SpeakRequest(BaseModel):
     text: str
-    voice_id: str = None   # defaults to env var or "aria" voice
+    voice_id: str = None
 
 
 @router.post("/speak")
 async def speak(req: SpeakRequest):
-    """
-    Convert text to speech using ElevenLabs.
-    Streams back audio/mpeg so the frontend can play it immediately.
-    """
     api_key = os.getenv("ELEVENLABS_API_KEY")
     if not api_key:
         raise HTTPException(500, "ELEVENLABS_API_KEY not configured")
 
     voice_id = req.voice_id or os.getenv("ELEVENLABS_VOICE_ID", "cgSgspJ2msm6clMCkdW9")
-    # ^ default: "Jessica" — warm, clear, English/multilingual
 
     text = req.text.strip()
     if not text:
         raise HTTPException(400, "Empty text")
 
-    # Strip markdown formatting for cleaner speech
     import re
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)   # bold
-    text = re.sub(r'\*(.*?)\*',     r'\1', text)    # italic
-    text = re.sub(r'`(.*?)`',       r'\1', text)    # inline code
-    text = re.sub(r'#{1,6}\s',      '',    text)    # headings
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)  # links
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'\*(.*?)\*',     r'\1', text)
+    text = re.sub(r'`(.*?)`',       r'\1', text)
+    text = re.sub(r'#{1,6}\s',      '',    text)
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
 
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream"
     headers = {
@@ -113,7 +104,7 @@ async def speak(req: SpeakRequest):
     }
     payload = {
         "text": text,
-        "model_id": "eleven_turbo_v2_5",   # fast, multilingual
+        "model_id": "eleven_turbo_v2_5",
         "voice_settings": {
             "stability": 0.45,
             "similarity_boost": 0.80,
