@@ -188,7 +188,10 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     const text = input.trim();
     if (!text && !attachedFile) return;
     setInput('');
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+    if (textareaRef.current) {
+      textareaRef.current.value = '';
+      textareaRef.current.style.height = 'auto';
+    }
     await doSend(text);
   }
 
