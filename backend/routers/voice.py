@@ -44,9 +44,15 @@ async def transcribe(
         # Groq expects a file-like with a name so it can detect format
         filename = audio.filename or "recording.webm"
 
+        # Normalize content type — iOS sends audio/mp4 which Groq rejects;
+        # map it to audio/m4a which Whisper accepts
+        content_type = audio.content_type or "audio/webm"
+        if content_type in ("audio/mp4", "video/mp4"):
+            content_type = "audio/m4a"
+
         transcription = client.audio.transcriptions.create(
             model="whisper-large-v3-turbo",
-            file=(filename, audio_bytes, audio.content_type or "audio/webm"),
+            file=(filename, audio_bytes, content_type),
             language=lang_hint,
             response_format="text",
         )
