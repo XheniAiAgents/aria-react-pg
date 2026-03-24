@@ -49,6 +49,7 @@ from backend.routers import (
     admin,
     user,
     debug,
+    voice,
 )
 
 
