@@ -214,6 +214,8 @@ body::after {
 .send-btn:hover:not(:disabled) { transform: scale(1.06); box-shadow: 0 4px 14px var(--a-glow); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .send-btn svg { width: 14px; height: 14px; fill: white; margin-left: 1px; }
+.send-btn.mic-btn.recording { animation: mic-pulse 1s ease-in-out infinite; }
+.send-btn.mic-btn.processing { opacity: 0.7; }
 .input-hint { font-size: 9px; color: var(--ghost); letter-spacing: 0.12em; text-align: center; margin-top: 7px; opacity: 0.5; }
 
 /* TASKS VIEW */
