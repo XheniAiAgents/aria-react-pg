@@ -1,13 +1,3 @@
-/**
- * useVoice — handles mic recording (Groq Whisper STT) + TTS playback (ElevenLabs)
- *
- * iOS Safari fix: getUserMedia must be called synchronously inside a user
- * gesture — no await before it. We use .then() chaining instead of async/await
- * in startRecording so the gesture context is never broken.
- *
- * iOS Safari also only supports audio/mp4 for MediaRecorder, not webm.
- */
-
 import { useState, useRef, useCallback } from 'react';
 
 export function useVoice({ API, lang = 'en', onTranscript, onError }) {
@@ -15,29 +5,29 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking]     = useState(false);
 
-  const mediaRecorderRef = useRef(null);
-  const chunksRef        = useRef([]);
-  const audioRef         = useRef(null);
-  const streamRef        = useRef(null);
+  const mediaRecorderRef  = useRef(null);
+  const chunksRef         = useRef([]);
+  const audioRef          = useRef(null);
+  const streamRef         = useRef(null);
+  const isRecordingRef    = useRef(false); // always current — avoids stale closure in toggleMic
+
+  function setRecording(val) {
+    isRecordingRef.current = val;
+    setIsRecording(val);
+  }
 
   function getBestMimeType() {
-    const candidates = [
-      'audio/webm;codecs=opus',
-      'audio/webm',
-      'audio/mp4',
-      'audio/ogg;codecs=opus',
-    ];
+    const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
     for (const t of candidates) {
       try { if (MediaRecorder.isTypeSupported(t)) return t; } catch {}
     }
     return '';
   }
 
-  // IMPORTANT: must NOT be async and must NOT have any await before
-  // getUserMedia — iOS Safari kills mic permission if the user gesture
-  // context is broken by any async hop before the getUserMedia call.
+  // Must NOT be async — iOS Safari kills mic permission if any await
+  // precedes getUserMedia inside a user gesture handler.
   function startRecording() {
-    if (isRecording || isProcessing) return;
+    if (isRecordingRef.current || isProcessing) return;
 
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
@@ -48,7 +38,7 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
         chunksRef.current = [];
         recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.start(100);
-        setIsRecording(true);
+        setRecording(true);
       })
       .catch(err => {
         console.error('[voice] mic access denied:', err);
@@ -56,10 +46,10 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
       });
   }
 
-  const stopAndTranscribe = useCallback(async () => {
-    if (!mediaRecorderRef.current) return;
+  async function stopAndTranscribe() {
+    if (!mediaRecorderRef.current || !isRecordingRef.current) return;
 
-    setIsRecording(false);
+    setRecording(false);
     setIsProcessing(true);
 
     await new Promise(resolve => {
@@ -95,16 +85,16 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     } finally {
       setIsProcessing(false);
     }
-  }, [API, lang, onTranscript, onError]);
+  }
 
-  const toggleMic = useCallback(() => {
-    if (isRecording) {
+  // Use ref so this never has a stale isRecording value
+  function toggleMic() {
+    if (isRecordingRef.current) {
       stopAndTranscribe();
     } else {
       startRecording();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRecording, stopAndTranscribe]);
+  }
 
   const speak = useCallback(async (text) => {
     if (!text?.trim()) return;
