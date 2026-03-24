@@ -15,9 +15,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
   const doSendRef = useRef(null);
 
-  // Keep ref updated on every render so onTranscript always calls the latest version
-  useEffect(() => { doSendRef.current = doSend; });
-
   const voice = useVoice({
     API,
     lang,
@@ -27,8 +24,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
         textareaRef.current.value = '';
         textareaRef.current.style.height = 'auto';
       }
-      // Use ref to always call the latest doSend, avoiding stale closure
-      setTimeout(() => doSendRef.current?.(text), 100);
+      doSendRef.current?.(text);
     },
     onError: (msg) => {
       setMessages(msgs => [...msgs, { type: 'aria', text: `⚠️ ${msg}`, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
@@ -191,6 +187,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       setIsThinking(false);
     }
   }
+  doSendRef.current = doSend;
 
   async function send() {
     const text = input.trim();

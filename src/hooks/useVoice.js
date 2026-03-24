@@ -1,20 +1,26 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 
 export function useVoice({ API, lang = 'en', onTranscript, onError }) {
   const [isRecording, setIsRecording]   = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking]     = useState(false);
 
-  const mediaRecorderRef  = useRef(null);
-  const chunksRef         = useRef([]);
-  const audioRef          = useRef(null);
-  const streamRef         = useRef(null);
-  const isRecordingRef    = useRef(false); // always current — avoids stale closure in toggleMic
+  const mediaRecorderRef = useRef(null);
+  const chunksRef        = useRef([]);
+  const audioRef         = useRef(null);
+  const streamRef        = useRef(null);
+  const isRecordingRef   = useRef(false);
 
-  function setRecording(val) {
-    isRecordingRef.current = val;
-    setIsRecording(val);
-  }
+  // Keep callbacks in refs so they're always current without causing re-renders
+  const onTranscriptRef  = useRef(onTranscript);
+  const onErrorRef       = useRef(onError);
+  onTranscriptRef.current = onTranscript;
+  onErrorRef.current      = onError;
+
+  const APIRef  = useRef(API);
+  const langRef = useRef(lang);
+  APIRef.current  = API;
+  langRef.current = lang;
 
   function getBestMimeType() {
     const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
@@ -24,8 +30,8 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     return '';
   }
 
-  // Must NOT be async — iOS Safari kills mic permission if any await
-  // precedes getUserMedia inside a user gesture handler.
+  // Must be a plain sync function — iOS Safari requires getUserMedia to be
+  // called directly inside the user gesture with no preceding await.
   function startRecording() {
     if (isRecordingRef.current || isProcessing) return;
 
@@ -38,18 +44,20 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
         chunksRef.current = [];
         recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
         recorder.start(100);
-        setRecording(true);
+        isRecordingRef.current = true;
+        setIsRecording(true);
       })
       .catch(err => {
-        console.error('[voice] mic access denied:', err);
-        onError?.('Microphone access denied. Please allow mic in browser settings.');
+        console.error('[voice] mic error:', err);
+        onErrorRef.current?.('Microphone access denied. Please allow mic in browser settings.');
       });
   }
 
   async function stopAndTranscribe() {
-    if (!mediaRecorderRef.current || !isRecordingRef.current) return;
+    if (!isRecordingRef.current || !mediaRecorderRef.current) return;
 
-    setRecording(false);
+    isRecordingRef.current = false;
+    setIsRecording(false);
     setIsProcessing(true);
 
     await new Promise(resolve => {
@@ -64,7 +72,10 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     const blob = new Blob(chunksRef.current, { type: mimeType });
     chunksRef.current = [];
 
-    if (blob.size < 1000) { setIsProcessing(false); return; }
+    if (blob.size < 1000) {
+      setIsProcessing(false);
+      return;
+    }
 
     try {
       const ext = mimeType.includes('mp4') || mimeType.includes('m4a') ? 'm4a'
@@ -73,21 +84,20 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
 
       const formData = new FormData();
       formData.append('audio', blob, `recording.${ext}`);
-      formData.append('lang', lang);
+      formData.append('lang', langRef.current);
 
-      const res = await fetch(`${API}/voice/transcribe`, { method: 'POST', body: formData });
+      const res = await fetch(`${APIRef.current}/voice/transcribe`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error(`Transcription failed: ${res.status}`);
       const { text } = await res.json();
-      if (text?.trim()) onTranscript?.(text.trim());
+      if (text?.trim()) onTranscriptRef.current?.(text.trim());
     } catch (err) {
       console.error('[voice] transcription error:', err);
-      onError?.('Could not transcribe audio. Please try again.');
+      onErrorRef.current?.('Could not transcribe audio. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   }
 
-  // Use ref so this never has a stale isRecording value
   function toggleMic() {
     if (isRecordingRef.current) {
       stopAndTranscribe();
@@ -96,12 +106,12 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     }
   }
 
-  const speak = useCallback(async (text) => {
+  async function speak(text) {
     if (!text?.trim()) return;
     stopSpeaking();
     try {
       setIsSpeaking(true);
-      const res = await fetch(`${API}/voice/speak`, {
+      const res = await fetch(`${APIRef.current}/voice/speak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -118,7 +128,7 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
       console.error('[voice] TTS error:', err);
       setIsSpeaking(false);
     }
-  }, [API]);
+  }
 
   function stopSpeaking() {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
