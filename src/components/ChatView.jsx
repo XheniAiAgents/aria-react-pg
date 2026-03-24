@@ -285,15 +285,17 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
           ) : (
             <button
               className={`send-btn mic-btn${voice.isRecording ? ' recording' : ''}${voice.isProcessing ? ' processing' : ''}`}
-              onPointerDown={e => { e.preventDefault(); voice.startRecording(); }}
-              onPointerUp={voice.stopAndTranscribe}
-              onPointerLeave={voice.stopAndTranscribe}
+              onClick={voice.toggleMic}
               disabled={isThinking}
-              title="Hold to talk"
+              title={voice.isRecording ? 'Tap to stop' : 'Tap to talk'}
             >
               {voice.isProcessing ? (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" strokeDasharray="31.4" strokeDashoffset="10" style={{ animation: 'spin 1s linear infinite', transformOrigin: 'center' }}/>
+                </svg>
+              ) : voice.isRecording ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
+                  <rect x="4" y="4" width="16" height="16" rx="3"/>
                 </svg>
               ) : (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
