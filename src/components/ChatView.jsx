@@ -8,7 +8,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   const [isThinking, setIsThinking] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [voiceMode, setVoiceMode] = useState(false);
-  const [debugLog, setDebugLog] = useState([]); // ← debug bar state
   const msgsRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -30,8 +29,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     onError: (msg) => {
       setMessages(msgs => [...msgs, { type: 'aria', text: `⚠️ ${msg}`, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
     },
-    // ← debug callback: shows last 6 events on screen so we can debug without Mac
-    onDebug: (msg) => setDebugLog(prev => [...prev.slice(-5), msg]),
   });
 
   const scrollDown = useCallback(() => {
@@ -241,20 +238,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       <div className="input-zone">
         <div className="input-shimmer" />
 
-        {/* ── DEBUG BAR — remove this block once mic is working on iOS ── */}
-        {debugLog.length > 0 && (
-          <div style={{
-            background: '#111', color: '#4eff91', fontSize: '11px',
-            padding: '6px 10px', fontFamily: 'monospace', lineHeight: '1.6',
-            borderTop: '1px solid #333'
-          }}>
-            {debugLog.map((l, i) => <div key={i}>{l}</div>)}
-            <div
-              style={{ color: '#888', cursor: 'pointer', marginTop: 2 }}
-              onClick={() => setDebugLog([])}
-            >tap to clear</div>
-          </div>
-        )}
 
         {attachedFile && (
           <div className="file-preview-bar">

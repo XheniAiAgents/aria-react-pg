@@ -26,6 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -83,6 +84,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# iOS Safari requires Permissions-Policy header to allow microphone in web apps
+class PermissionsPolicyMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Permissions-Policy"] = "microphone=*, camera=*, geolocation=*"
+        response.headers["Feature-Policy"] = "microphone *; camera *"
+        return response
+
+app.add_middleware(PermissionsPolicyMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 
