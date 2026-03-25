@@ -3,14 +3,12 @@ import { useState, useEffect, useRef } from 'react';
 import DateTimePicker from './DateTimePicker';
 import { fmtDatetime } from '../utils/helpers';
 
-// Combine separate date + time inputs into UTC ISO string for backend
-// Split a stored reminder_at back into date and time for display in inputs
 function splitReminder(reminder_at) {
   if (!reminder_at) return { date: '', time: '' };
   const d = new Date(reminder_at);
   if (isNaN(d)) return { date: '', time: '' };
-  const date = d.toLocaleDateString('en-CA'); // YYYY-MM-DD
-  const time = d.toTimeString().slice(0, 5);   // HH:MM
+  const date = d.toLocaleDateString('en-CA');
+  const time = d.toTimeString().slice(0, 5);
   return { date, time };
 }
 
@@ -38,10 +36,8 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
         apiFetch('/tasks?only_pending=true').then(r => r.json()),
         apiFetch('/tasks?only_pending=false').then(r => r.json()),
       ]);
-      const pendingTasks = pendingRes.tasks || [];
-      const allTasks = completedRes.tasks || [];
-      setPending(pendingTasks);
-      setCompleted(allTasks.filter(t => t.done === 1));
+      setPending(pendingRes.tasks || []);
+      setCompleted((completedRes.tasks || []).filter(t => t.done === 1));
     } catch {}
   }
 
@@ -107,26 +103,6 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
   }
 
   function renderTask(task, isDone) {
-    if (editId === task.id) {
-      return (
-        <div key={task.id} className="add-task-form open" style={{ marginBottom: '6px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <input className="form-input" value={editTitle}
-              onChange={e => setEditTitle(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && saveEdit()}
-              autoFocus />
-            <DateTimePicker value={editReminder} onChange={setEditReminder} />
-          </div>
-          <div className="form-actions">
-            <button className="btn-ghost" onClick={cancelEdit}>Cancel</button>
-            <button className="btn-ghost" style={{ color: '#e05370' }}
-              onClick={() => { deleteTask(task.id); cancelEdit(); }}>Delete</button>
-            <button className="btn-primary" onClick={saveEdit}>Save</button>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div
         key={task.id}
@@ -201,6 +177,45 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
       {pending.length > 0 && editId === null && (
         <div style={{ fontSize: '10px', color: 'var(--ghost)', textAlign: 'center', padding: '8px 0', fontStyle: 'italic' }}>
           Long press to edit or delete
+        </div>
+      )}
+
+      {/* ── Edit Modal — same style as EventModal ── */}
+      {editId !== null && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '20px',
+        }} onClick={cancelEdit}>
+          <div style={{
+            background: 'var(--surface)', borderRadius: '16px',
+            padding: '24px', width: '100%', maxWidth: '420px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            display: 'flex', flexDirection: 'column', gap: '16px',
+          }} onClick={e => e.stopPropagation()}>
+
+            <div style={{ fontSize: '18px', fontFamily: 'Cormorant Garamond, serif', color: 'var(--ink)' }}>
+              Edit Task
+            </div>
+
+            <input
+              className="form-input"
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveEdit()}
+              autoFocus
+              style={{ fontSize: '15px', padding: '10px 12px' }}
+            />
+
+            <DateTimePicker value={editReminder} onChange={setEditReminder} />
+
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button className="btn-ghost" onClick={cancelEdit}>Cancel</button>
+              <button className="btn-ghost" style={{ color: '#e05370' }}
+                onClick={() => { deleteTask(editId); cancelEdit(); }}>Delete</button>
+              <button className="btn-primary" onClick={saveEdit}>Save</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
