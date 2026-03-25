@@ -372,7 +372,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
             onChange={e => setNewTitle(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submitTask()} />
           <DatePicker value={newDate} onChange={setNewDate} />
-          {newDate && <TimePicker value={newTime} onChange={setNewTime} placeholder="Set time…" />}
+          <TimePicker value={newTime} onChange={setNewTime} placeholder="Set time…" />
         </div>
         <div className="form-actions" style={{ marginTop: '8px' }}>
           <button className="btn-ghost" onClick={() => { setAddOpen(false); setNewTitle(''); setNewDate(''); setNewTime(''); }}>Cancel</button>
@@ -420,7 +420,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
               onKeyDown={e => e.key === 'Enter' && saveEdit()}
               autoFocus style={{ fontSize: '15px', padding: '10px 12px' }} />
             <DatePicker value={editDate} onChange={setEditDate} />
-            {editDate && <TimePicker value={editTime} onChange={setEditTime} placeholder="Set time…" />}
+            <TimePicker value={editTime} onChange={setEditTime} placeholder="Set time…" />
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button className="btn-ghost" onClick={cancelEdit}>Cancel</button>
               <button className="btn-ghost" style={{ color: '#e05370' }}
