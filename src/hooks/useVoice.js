@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 
-export function useVoice({ API, lang = 'en', onTranscript, onError }) {
+export function useVoice({ API, lang = 'en', onTranscript, onError, onDebug }) {
   const [isRecording, setIsRecording]   = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking]     = useState(false);
@@ -11,26 +11,23 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
   const streamRef        = useRef(null);
   const isRecordingRef   = useRef(false);
 
-  // Keep callbacks in refs so they're always current without causing re-renders
   const onTranscriptRef  = useRef(onTranscript);
   const onErrorRef       = useRef(onError);
+  const onDebugRef       = useRef(onDebug);
   onTranscriptRef.current = onTranscript;
   onErrorRef.current      = onError;
+  onDebugRef.current      = onDebug;
 
   const APIRef  = useRef(API);
   const langRef = useRef(lang);
   APIRef.current  = API;
   langRef.current = lang;
 
-  // FIX 1: Pre-created Audio element for iOS TTS autoplay.
-  // iOS only allows audio.play() if the Audio element was created AND
-  // play() was called (even silently) inside a direct user gesture.
-  // We unlock it once on first mic tap so TTS works after the async fetch.
+  // iOS audio unlock — play silent audio on first mic tap so TTS works after async fetch
   const iosAudioUnlockedRef = useRef(false);
   function unlockIOSAudio() {
     if (iosAudioUnlockedRef.current) return;
     iosAudioUnlockedRef.current = true;
-    // Play a silent 1-frame audio to prime iOS audio context
     const silence = new Audio("data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=");
     silence.volume = 0;
     silence.play().catch(() => {});
@@ -44,31 +41,35 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     return '';
   }
 
-  // Must be a plain sync function — iOS Safari requires getUserMedia to be
-  // called directly inside the user gesture with no preceding await.
   function startRecording() {
     if (isRecordingRef.current || isProcessing) return;
 
-    // FIX 1: Unlock iOS audio on the same gesture that starts recording
     unlockIOSAudio();
+    onDebugRef.current?.('🎙 requesting mic...');
 
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
         streamRef.current = stream;
         const mimeType = getBestMimeType();
+        onDebugRef.current?.(`mime: ${mimeType || 'default'}`);
+
         const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
         mediaRecorderRef.current = recorder;
         chunksRef.current = [];
+
         recorder.ondataavailable = e => {
-          console.log('[voice] chunk:', e.data.size, 'bytes'); // debug — remove after fixing
+          onDebugRef.current?.(`chunk: ${e.data.size}b`);
           if (e.data.size > 0) chunksRef.current.push(e.data);
         };
+
         recorder.start(100);
         isRecordingRef.current = true;
         setIsRecording(true);
+        onDebugRef.current?.('▶ recording...');
       })
       .catch(err => {
         console.error('[voice] mic error:', err);
+        onDebugRef.current?.(`❌ mic error: ${err.message}`);
         onErrorRef.current?.('Microphone access denied. Please allow mic in browser settings.');
       });
   }
@@ -79,13 +80,12 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     isRecordingRef.current = false;
     setIsRecording(false);
     setIsProcessing(true);
+    onDebugRef.current?.('⏹ stopping...');
 
     await new Promise(resolve => {
       const recorder = mediaRecorderRef.current;
       recorder.onstop = resolve;
-      // FIX 3: iOS Safari doesn't flush the last chunk automatically on stop().
-      // requestData() forces a final dataavailable event, then we wait 150ms
-      // for it to fire before calling stop().
+      // iOS Safari doesn't flush the last chunk on stop() — requestData() forces it
       recorder.requestData();
       setTimeout(() => recorder.stop(), 150);
     });
@@ -97,12 +97,11 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
     const blob = new Blob(chunksRef.current, { type: mimeType });
     chunksRef.current = [];
 
-    // FIX 2: Lower the minimum blob size threshold for iOS.
-    // iOS Safari produces audio/mp4 which is encoded differently — valid short
-    // recordings can be under 1000 bytes and were being silently discarded.
+    onDebugRef.current?.(`blob: ${blob.size}b | ${mimeType}`);
+
     const minSize = mimeType.includes('mp4') ? 200 : 1000;
     if (blob.size < minSize) {
-      console.warn('[voice] blob too small, skipping:', blob.size, mimeType);
+      onDebugRef.current?.(`❌ blob too small (min ${minSize}b)`);
       setIsProcessing(false);
       return;
     }
@@ -116,12 +115,18 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
       formData.append('audio', blob, `recording.${ext}`);
       formData.append('lang', langRef.current);
 
+      onDebugRef.current?.(`📤 sending ${ext}...`);
+
       const res = await fetch(`${APIRef.current}/voice/transcribe`, { method: 'POST', body: formData });
-      if (!res.ok) throw new Error(`Transcription failed: ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { text } = await res.json();
+
+      onDebugRef.current?.(`✅ text: "${text?.slice(0, 30)}"`);
+
       if (text?.trim()) onTranscriptRef.current?.(text.trim());
     } catch (err) {
       console.error('[voice] transcription error:', err);
+      onDebugRef.current?.(`❌ transcribe error: ${err.message}`);
       onErrorRef.current?.('Could not transcribe audio. Please try again.');
     } finally {
       setIsProcessing(false);
@@ -149,10 +154,6 @@ export function useVoice({ API, lang = 'en', onTranscript, onError }) {
       if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
-
-      // FIX 1 (cont): Reuse the pre-existing audio element if available,
-      // otherwise create new. iOS allows .play() here because we already
-      // unlocked the audio context during the mic tap gesture.
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); audioRef.current = null; };

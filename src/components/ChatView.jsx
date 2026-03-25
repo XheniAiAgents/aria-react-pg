@@ -6,8 +6,9 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [attachedFile, setAttachedFile] = useState(null); // { file, preview, type }
-  const [voiceMode, setVoiceMode] = useState(false);      // TTS auto-read toggle
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [debugLog, setDebugLog] = useState([]); // ← debug bar state
   const msgsRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -29,6 +30,8 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     onError: (msg) => {
       setMessages(msgs => [...msgs, { type: 'aria', text: `⚠️ ${msg}`, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
     },
+    // ← debug callback: shows last 6 events on screen so we can debug without Mac
+    onDebug: (msg) => setDebugLog(prev => [...prev.slice(-5), msg]),
   });
 
   const scrollDown = useCallback(() => {
@@ -40,14 +43,12 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   useEffect(() => { 
     if (isFirstLoad.current) {
       isFirstLoad.current = false;
-      // Still scroll to bottom on first load so user sees latest messages
       setTimeout(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, 100);
       return;
     }
     scrollDown(); 
   }, [messages, scrollDown]);
 
-  // Load history or show welcome message
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -103,7 +104,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Email bridge
   useEffect(() => {
     async function onSendPending() {
       const msg = window.__ariaPendingMessage;
@@ -115,8 +115,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     return () => window.removeEventListener('aria:send-pending', onSendPending);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, mode, lang]);
-
-  // ── FILE HANDLING ─────────────────────────────────────────────────────────
 
   function handleFileSelect(e) {
     const file = e.target.files?.[0];
@@ -135,8 +133,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   function removeAttachment() {
     setAttachedFile(null);
   }
-
-  // ── SEND ─────────────────────────────────────────────────────────────────
 
   async function doSend(text) {
     if ((!text.trim() && !attachedFile) || isThinking) return;
@@ -165,7 +161,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
         const data = await res.json();
         response = data.response;
       } else {
-        // Build local time string from browser (not UTC)
         const d = new Date();
         const localTime = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:00`;
         const data = await (await fetch(`${API}/chat`, {
@@ -179,7 +174,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       setMessages(msgs => [...msgs.filter(m => m.type !== 'typing'), { type: 'aria', text: response, time }]);
       onMsgCount(c => c + 1);
-      // Auto-read ARIA response if voice mode is on
       if (voiceMode) voice.speak(response);
     } catch {
       setMessages(msgs => msgs.filter(m => m.type !== 'typing'));
@@ -247,6 +241,21 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       <div className="input-zone">
         <div className="input-shimmer" />
 
+        {/* ── DEBUG BAR — remove this block once mic is working on iOS ── */}
+        {debugLog.length > 0 && (
+          <div style={{
+            background: '#111', color: '#4eff91', fontSize: '11px',
+            padding: '6px 10px', fontFamily: 'monospace', lineHeight: '1.6',
+            borderTop: '1px solid #333'
+          }}>
+            {debugLog.map((l, i) => <div key={i}>{l}</div>)}
+            <div
+              style={{ color: '#888', cursor: 'pointer', marginTop: 2 }}
+              onClick={() => setDebugLog([])}
+            >tap to clear</div>
+          </div>
+        )}
+
         {attachedFile && (
           <div className="file-preview-bar">
             {attachedFile.preview
@@ -285,7 +294,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
             rows={1}
           />
 
-          {/* ── Smart mic / send button ── */}
           {input.trim() || attachedFile ? (
             <button className="send-btn" onClick={send} disabled={isThinking} title="Send">
               <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -315,7 +323,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
               )}
             </button>
           )}
-
 
         </div>
         <div className="input-hint">{t ? t('send') : '↵ send · shift+↵ newline'}</div>
