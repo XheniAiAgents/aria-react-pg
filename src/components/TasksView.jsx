@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiFetch';
 import { useState, useEffect, useRef } from 'react';
 import DateTimePicker from './DateTimePicker';
 import { fmtDatetime } from '../utils/helpers';
@@ -47,9 +48,9 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
   async function submitTask() {
     if (!newTitle.trim()) { showToast(t('addTask') + '…', true); return; }
     try {
-      const res = await fetch(`${API}/tasks`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: newTitle, reminder_at: newReminder || null })
+      const res = await apiFetch('/tasks', {
+        method: 'POST',
+        json: { title: newTitle, reminder_at: newReminder || null }
       });
       if (!res.ok) { const e = await res.json(); throw new Error(JSON.stringify(e)); }
       setNewTitle(''); setNewReminder(null); setAddOpen(false);
@@ -84,9 +85,9 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
   async function saveEdit() {
     if (!editTitle.trim()) return;
     try {
-      await fetch(`${API}/tasks/${editId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, title: editTitle, reminder_at: editReminder || null })
+      await apiFetch(`/tasks/${editId}`, {
+        method: 'PUT',
+        json: { title: editTitle, reminder_at: editReminder || null }
       });
       cancelEdit();
       await loadTasks();
