@@ -34,6 +34,12 @@ export function useVoice({ API, lang = 'en', onTranscript, onError, onDebug }) {
   }
 
   function getBestMimeType() {
+    // iOS Safari claims to support audio/webm via isTypeSupported() but records
+    // nearly empty blobs (0-5 bytes). Force audio/mp4 on iOS Safari explicitly.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) return 'audio/mp4';
+
     const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
     for (const t of candidates) {
       try { if (MediaRecorder.isTypeSupported(t)) return t; } catch {}
