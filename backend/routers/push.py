@@ -2,15 +2,15 @@
 ARIA v4 — Web Push router
 """
 import os
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from backend.database import save_push_subscription, get_pool
+from backend.routers.jwt_auth import get_current_user
 
 router = APIRouter()
 
 
 class PushSubscribeRequest(BaseModel):
-    user_id:  int
     endpoint: str
     p256dh:   str
     auth:     str
@@ -26,9 +26,10 @@ async def get_vapid_public_key():
 
 
 @router.post("/push/subscribe")
-async def push_subscribe(req: PushSubscribeRequest):
+async def push_subscribe(req: PushSubscribeRequest, current_user: dict = Depends(get_current_user)):
     """Save a browser push subscription for a user."""
-    await save_push_subscription(req.user_id, req.endpoint, req.p256dh, req.auth)
+    user_id = int(current_user['sub'])
+    await save_push_subscription(user_id, req.endpoint, req.p256dh, req.auth)
     return {"ok": True}
 
 
