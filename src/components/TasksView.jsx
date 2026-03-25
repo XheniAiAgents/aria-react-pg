@@ -153,7 +153,7 @@ export default function TasksView({ API, userId, visible, showToast, t }) {
   }
 
   return (
-    <div id="tasksView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', overflow: 'hidden', height: '100%' }}>
+    <div id="tasksView" style={{ display: visible ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}>
       <div className="tasks-header">
         <div className="tasks-title">{t('tasks')}</div>
         <button className="add-btn" onClick={() => setAddOpen(o => !o)}>
