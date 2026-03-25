@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 export default function RightPanel({ API, userId, msgCount, memCount, refreshTick, t }) {
   const [tasks, setTasks] = useState([]);
@@ -6,12 +7,12 @@ export default function RightPanel({ API, userId, msgCount, memCount, refreshTic
 
   const load = useCallback(async () => {
     try {
-      const { tasks } = await (await fetch(`${API}/tasks/${userId}`)).json();
+      const { tasks } = await (await apiFetch('/tasks')).json();
       setTasks((tasks || []).slice(0, 4));
     } catch {}
     try {
       const today = new Date().toISOString().split('T')[0];
-      const { events } = await (await fetch(`${API}/events/${userId}?date=${today}`)).json();
+      const { events } = await (await apiFetch(`/events?date=${today}`)).json();
       setEvents(events || []);
     } catch {}
   }, [API, userId]);
@@ -19,7 +20,7 @@ export default function RightPanel({ API, userId, msgCount, memCount, refreshTic
   useEffect(() => { load(); }, [load, refreshTick]);
 
   async function completeTask(id) {
-    await fetch(`${API}/tasks/${id}/complete?user_id=${userId}`, { method: 'POST' });
+    await apiFetch(`/tasks/${id}/complete`, { method: 'POST' });
     load();
   }
 

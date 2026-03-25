@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 export function useGoogleCalendar(API, userId, showToast) {
   const [calendarConnected, setCalendarConnected] = useState(false);
@@ -7,7 +8,7 @@ export function useGoogleCalendar(API, userId, showToast) {
   const loadCalendarStatus = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`${API}/auth/google-calendar/status?user_id=${userId}`);
+      const res = await apiFetch('/auth/google-calendar/status');
       const data = await res.json();
       setCalendarConnected(data.connected);
       if (data.connected) setCalendarEmail(data.calendar_email || '');
@@ -16,7 +17,7 @@ export function useGoogleCalendar(API, userId, showToast) {
 
   async function connectCalendar() {
     try {
-      const res = await fetch(`${API}/auth/google-calendar/start?user_id=${userId}`);
+      const res = await apiFetch('/auth/google-calendar/start');
       const data = await res.json();
       window.open(data.url, 'calendar_oauth', 'width=500,height=650,left=200,top=100');
       window.addEventListener('message', async (e) => {
@@ -29,7 +30,7 @@ export function useGoogleCalendar(API, userId, showToast) {
   }
 
   async function disconnectCalendar() {
-    await fetch(`${API}/auth/google-calendar/disconnect?user_id=${userId}`, { method: 'DELETE' });
+    await apiFetch('/auth/google-calendar/disconnect', { method: 'DELETE' });
     setCalendarConnected(false);
     setCalendarEmail('');
     showToast('Google Calendar disconnected.');

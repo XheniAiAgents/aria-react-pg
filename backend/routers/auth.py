@@ -1,7 +1,5 @@
 """
-ARIA v4 — Auth router
-Routes: /auth/register, /auth/login, /login, /auth/forgot-password,
-        /auth/verify-reset-token, /auth/reset-password, /auth/change-password
+ARIA v4 — Auth router (JWT version)
 """
 import asyncio
 from typing import Optional
@@ -19,12 +17,12 @@ from backend.database import (
     get_pool,
 )
 from backend.email_service import send_welcome_email, send_reset_email
+from backend.routers.jwt_auth import create_token, get_current_user
+from fastapi import Depends
 
 router  = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-
-# ── Request models ────────────────────────────────────────────────────────────
 
 class RegisterRequest(BaseModel):
     name:     str
@@ -47,12 +45,9 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 class ChangePasswordRequest(BaseModel):
-    user_id:          int
     current_password: str
     new_password:     str
 
-
-# ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/auth/register")
 @limiter.limit("10/minute")
@@ -65,7 +60,9 @@ async def auth_register(req: RegisterRequest, request: Request):
     if not user:
         raise HTTPException(409, "Email already registered")
     asyncio.create_task(send_welcome_email(req.email, req.name.strip()))
-    return {"user": {k: v for k, v in user.items() if k not in ("password_hash", "password_salt")}}
+    token = create_token(user["id"], user["name"], user["email"])
+    safe_user = {k: v for k, v in user.items() if k not in ("password_hash", "password_salt")}
+    return {"user": safe_user, "token": token}
 
 
 @router.post("/auth/login")
@@ -76,7 +73,9 @@ async def auth_login(req: EmailLoginRequest, request: Request):
         raise HTTPException(401, "Invalid email or password")
     if user.get("is_disabled"):
         raise HTTPException(403, "Account disabled. Please contact support.")
-    return {"user": {k: v for k, v in user.items() if k not in ("password_hash", "password_salt")}}
+    token = create_token(user["id"], user["name"], user["email"])
+    safe_user = {k: v for k, v in user.items() if k not in ("password_hash", "password_salt")}
+    return {"user": safe_user, "token": token}
 
 
 @router.post("/login")
@@ -122,8 +121,8 @@ async def do_reset_password(req: ResetPasswordRequest):
 
 
 @router.post("/auth/change-password")
-async def change_password(req: ChangePasswordRequest):
-    user = await get_user_by_id(req.user_id)
+async def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    user = await get_user_by_id(current_user["sub"])
     if not user:
         raise HTTPException(404, "User not found")
     if not user.get("password_hash"):
@@ -137,6 +136,12 @@ async def change_password(req: ChangePasswordRequest):
     async with pool.acquire() as conn:
         await conn.execute(
             "UPDATE users SET password_hash=$1, password_salt=$2 WHERE id=$3",
-            hashed, salt, req.user_id,
+            hashed, salt, int(current_user["sub"]),
         )
     return {"status": "Password updated"}
+
+
+@router.get("/auth/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Validate token and return current user info."""
+    return {"user_id": int(current_user["sub"]), "name": current_user["name"], "email": current_user["email"]}

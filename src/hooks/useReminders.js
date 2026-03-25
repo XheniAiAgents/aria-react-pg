@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 export function useReminders(API, userId, onFire) {
   const notifiedEvents = useRef(new Set());
@@ -38,7 +39,7 @@ export function useReminders(API, userId, onFire) {
     const now = new Date();
     const windowMs = 65000;
     try {
-      const { events } = await (await fetch(`${API}/events/${userId}`)).json();
+      const { events } = await (await apiFetch('/events')).json();
       for (const e of events) {
         if (notifiedEvents.current.has(e.id) || !e.event_time) continue;
         const eventDt = new Date(e.event_date + 'T' + e.event_time);
@@ -50,7 +51,7 @@ export function useReminders(API, userId, onFire) {
       }
     } catch {}
     try {
-      const { tasks } = await (await fetch(`${API}/tasks/${userId}`)).json();
+      const { tasks } = await (await apiFetch('/tasks')).json();
       for (const t of tasks) {
         if (notifiedTasks.current.has(t.id) || !t.reminder_at) continue;
         const reminderDt = new Date(t.reminder_at);
@@ -59,7 +60,7 @@ export function useReminders(API, userId, onFire) {
           fireReminder('📌', 'Task reminder', t.title);
           // Auto-mark as completed so it doesn't fire again
           try {
-            await fetch(`${API}/tasks/${t.id}/complete?user_id=${userId}`, { method: 'POST' });
+            await apiFetch(`/tasks/${t.id}/complete`, { method: 'POST' });
           } catch {}
         }
       }

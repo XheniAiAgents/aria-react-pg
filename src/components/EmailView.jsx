@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 import { fmt } from '../utils/helpers';
 
 export default function EmailView({ API, userId, lang, visible, showToast, onOpenSettings, t }) {
@@ -32,7 +33,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
 
   async function loadHistory() {
     try {
-      const res = await fetch(`${API}/history/${userId}?mode=email&limit=20`);
+      const res = await apiFetch('/history/me?mode=email&limit=20');
       if (res.ok) {
         const { messages: history } = await res.json();
         if (history && history.length > 0) {
@@ -48,12 +49,12 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
 
   async function loadEmailView() {
     try {
-      const res = await fetch(`${API}/auth/google/status?user_id=${userId}`);
+      const res = await apiFetch('/auth/google/status');
       const data = await res.json();
       setConnected(data.connected);
       if (!data.connected) return;
       setLoading(true); setSummary(''); setEmails([]);
-      const r = await fetch(`${API}/email/fetch?user_id=${userId}`);
+      const r = await apiFetch('/email/fetch');
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         setSummary(`Error loading emails: ${err.detail || r.status}`);
@@ -78,7 +79,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
       const fullQ = q;
       const { response } = await (await fetch(`${API}/chat`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: fullQ, user_id: userId, mode: 'email', lang })
+        body: JSON.stringify({ message: fullQ, mode: 'email', lang })
       })).json();
       setConversation(c => [...c, { role: 'assistant', text: response, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
     } catch { showToast('Cannot reach ARIA.', true); }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 function CircularWheel({ items, value, onChange, height = 160, onItemClick }) {
   const ref = useRef(null);
@@ -224,12 +225,12 @@ export default function EventModal({ API, userId, selectedDate, open, onClose, o
 
   async function submitEvent() {
     if (!title.trim() || !date) { showToast('Title and date required.', true); return; }
-    const body = { user_id: userId, title, event_date: date, event_time: time || null, end_time: endTime || null, description: desc || null, reminder_minutes: parseInt(remind) || 15 };
+    const body = { title, event_date: date, event_time: time || null, end_time: endTime || null, description: desc || null, reminder_minutes: parseInt(remind) || 15 };
     if (isEdit) {
-      await fetch(`${API}/events/${editEvent.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await apiFetch(`/events/${editEvent.id}`, { method: 'PUT', json: body });
       onClose(); onEdited && onEdited(); showToast('Event updated.');
     } else {
-      await fetch(`${API}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await apiFetch('/events', { method: 'POST', json: body });
       onClose(); onAdded && onAdded(); showToast('Event added.');
     }
   }

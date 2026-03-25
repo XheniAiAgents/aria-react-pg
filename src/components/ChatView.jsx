@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 import { fmt } from '../utils/helpers';
 import { useVoice } from '../hooks/useVoice';
 
@@ -6,27 +7,23 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [attachedFile, setAttachedFile] = useState(null);
-  const [voiceMode, setVoiceMode] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null); // { file, preview, type }
+  const [voiceMode, setVoiceMode] = useState(false);      // TTS auto-read toggle
   const msgsRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const initializedRef = useRef(false);
 
-  const doSendRef = useRef(null);
-
   const voice = useVoice({
     API,
     lang,
     onTranscript: (text) => {
-      setInput('');
-      if (textareaRef.current) {
-        textareaRef.current.value = '';
-        textareaRef.current.style.height = 'auto';
-      }
-      doSendRef.current?.(text);
+      setInput(text);
+      // Auto-send after voice transcription
+      setTimeout(() => doSend(text), 100);
     },
     onError: (msg) => {
+      // Show brief error in chat
       setMessages(msgs => [...msgs, { type: 'aria', text: `⚠️ ${msg}`, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
     },
   });
@@ -40,12 +37,14 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   useEffect(() => { 
     if (isFirstLoad.current) {
       isFirstLoad.current = false;
+      // Still scroll to bottom on first load so user sees latest messages
       setTimeout(() => { if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight; }, 100);
       return;
     }
     scrollDown(); 
   }, [messages, scrollDown]);
 
+  // Load history or show welcome message
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -73,7 +72,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
     async function loadHistory() {
       try {
-        const res = await fetch(`${API}/history/${userId}?mode=${mode}&limit=30`);
+        const res = await apiFetch(`/history/me?mode=${mode}&limit=30`);
         if (res.ok) {
           const { messages: history } = await res.json();
           if (history && history.length > 0) {
@@ -101,6 +100,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Email bridge
   useEffect(() => {
     async function onSendPending() {
       const msg = window.__ariaPendingMessage;
@@ -112,6 +112,8 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     return () => window.removeEventListener('aria:send-pending', onSendPending);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, mode, lang]);
+
+  // ── FILE HANDLING ─────────────────────────────────────────────────────────
 
   function handleFileSelect(e) {
     const file = e.target.files?.[0];
@@ -131,6 +133,8 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
     setAttachedFile(null);
   }
 
+  // ── SEND ─────────────────────────────────────────────────────────────────
+
   async function doSend(text) {
     if ((!text.trim() && !attachedFile) || isThinking) return;
     const currentFile = attachedFile;
@@ -149,20 +153,20 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
       if (currentFile) {
         const formData = new FormData();
-        formData.append('user_id', userId);
         formData.append('mode', mode);
         formData.append('lang', lang);
         formData.append('message', text || '');
         formData.append('file', currentFile.file);
-        const res = await fetch(`${API}/chat/file`, { method: 'POST', body: formData });
+        const res = await apiFetch('/chat/file', { method: 'POST', body: formData });
         const data = await res.json();
         response = data.response;
       } else {
+        // Build local time string from browser (not UTC)
         const d = new Date();
         const localTime = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:00`;
-        const data = await (await fetch(`${API}/chat`, {
+        const data = await (await apiFetch('/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          
           body: JSON.stringify({ message: text, user_id: userId, mode, lang, user_local_time: localTime })
         })).json();
         response = data.response;
@@ -171,6 +175,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       setMessages(msgs => [...msgs.filter(m => m.type !== 'typing'), { type: 'aria', text: response, time }]);
       onMsgCount(c => c + 1);
+      // Auto-read ARIA response if voice mode is on
       if (voiceMode) voice.speak(response);
     } catch {
       setMessages(msgs => msgs.filter(m => m.type !== 'typing'));
@@ -178,16 +183,12 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       setIsThinking(false);
     }
   }
-  doSendRef.current = doSend;
 
   async function send() {
     const text = input.trim();
     if (!text && !attachedFile) return;
     setInput('');
-    if (textareaRef.current) {
-      textareaRef.current.value = '';
-      textareaRef.current.style.height = 'auto';
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
     await doSend(text);
   }
 
@@ -238,7 +239,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
       <div className="input-zone">
         <div className="input-shimmer" />
 
-
         {attachedFile && (
           <div className="file-preview-bar">
             {attachedFile.preview
@@ -256,8 +256,8 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
             title="Attach file"
             disabled={isThinking}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
             </svg>
           </button>
           <input
@@ -277,36 +277,74 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
             rows={1}
           />
 
-          {input.trim() || attachedFile ? (
-            <button className="send-btn" onClick={send} disabled={isThinking} title="Send">
-              <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-            </button>
-          ) : (
-            <button
-              className={`send-btn mic-btn${voice.isRecording ? ' recording' : ''}${voice.isProcessing ? ' processing' : ''}`}
-              onClick={voice.toggleMic}
-              disabled={isThinking}
-              title={voice.isRecording ? 'Tap to stop' : 'Tap to talk'}
-            >
-              {voice.isProcessing ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" strokeDasharray="31.4" strokeDashoffset="10" style={{ animation: 'spin 1s linear infinite', transformOrigin: 'center' }}/>
-                </svg>
-              ) : voice.isRecording ? (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="white">
-                  <rect x="4" y="4" width="16" height="16" rx="3"/>
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                  <rect x="9" y="2" width="6" height="12" rx="3"/>
-                  <path d="M5 10a7 7 0 0 0 14 0"/>
-                  <line x1="12" y1="19" x2="12" y2="22"/>
-                  <line x1="8" y1="22" x2="16" y2="22"/>
-                </svg>
-              )}
-            </button>
-          )}
+          {/* ── Hold-to-talk button ── */}
+          <button
+            className={`voice-btn hold${voice.isRecording ? ' recording' : ''}${voice.isProcessing ? ' processing' : ''}`}
+            onPointerDown={e => { e.preventDefault(); voice.startRecording(); }}
+            onPointerUp={voice.stopAndTranscribe}
+            onPointerLeave={voice.stopAndTranscribe}
+            disabled={isThinking || voice.isProcessing}
+            title="Hold to talk"
+          >
+            {voice.isProcessing ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" strokeDasharray="31.4" strokeDashoffset="10" style={{ animation: 'spin 1s linear infinite', transformOrigin: 'center' }}/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="2" width="6" height="12" rx="3"/>
+                <path d="M5 10a7 7 0 0 0 14 0"/>
+                <line x1="12" y1="19" x2="12" y2="22"/>
+                <line x1="8" y1="22" x2="16" y2="22"/>
+              </svg>
+            )}
+          </button>
 
+          {/* ── Toggle mic button ── */}
+          <button
+            className={`voice-btn toggle${voice.isRecording ? ' recording' : ''}`}
+            onClick={voice.toggleMic}
+            disabled={isThinking || voice.isProcessing}
+            title={voice.isRecording ? 'Stop recording' : 'Click to talk'}
+          >
+            {voice.isRecording ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="4" y="4" width="16" height="16" rx="2"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="22 2 11 13"/><path d="M22 2 15 22 11 13 2 9l20-7z"/>
+              </svg>
+            )}
+          </button>
+
+          {/* ── TTS auto-read toggle ── */}
+          <button
+            className={`voice-btn tts-toggle${voiceMode ? ' active' : ''}${voice.isSpeaking ? ' speaking' : ''}`}
+            onClick={() => { if (voice.isSpeaking) voice.stopSpeaking(); setVoiceMode(v => !v); }}
+            title={voiceMode ? (voice.isSpeaking ? 'Stop speaking' : 'Voice mode on — click to turn off') : 'Turn on voice mode (ARIA speaks responses)'}
+          >
+            {voice.isSpeaking ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+              </svg>
+            ) : voiceMode ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            )}
+          </button>
+
+          <button className="send-btn" onClick={send} disabled={isThinking || (!input.trim() && !attachedFile)}>
+            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
         </div>
         <div className="input-hint">{t ? t('send') : '↵ send · shift+↵ newline'}</div>
       </div>

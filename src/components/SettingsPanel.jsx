@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 import LanguageSelector from './LanguageSelector';
 
 function Card({ children, style = {} }) {
@@ -196,7 +197,7 @@ export default function SettingsPanel({
             value={userTimezone || 'Europe/Madrid'}
             onChange={async (e) => {
               const tz = e.target.value;
-              await fetch(`${API}/user/timezone?user_id=${userId}&timezone=${encodeURIComponent(tz)}`, { method: 'POST' });
+              await apiFetch(`/user/timezone?timezone=${encodeURIComponent(tz)}`, { method: 'POST' });
               onSetTimezone && onSetTimezone(tz);
               showToast(`Timezone: ${tz}`);
             }}

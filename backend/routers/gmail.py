@@ -5,9 +5,10 @@ Routes: /auth/google/* (OAuth + digest settings), /email/fetch
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 
+from backend.routers.jwt_auth import get_current_user
 from backend.database import (
     get_user_by_id,
     save_google_token, get_google_token, delete_google_token,
@@ -29,7 +30,8 @@ def _parse_token(raw) -> dict:
 # ── OAuth ─────────────────────────────────────────────────────────────────────
 
 @router.get("/auth/google/start")
-async def google_auth_start(user_id: int):
+async def google_auth_start(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     return {"url": get_auth_url(user_id)}
 
 
@@ -66,7 +68,8 @@ async def google_auth_callback(code: str, state: str):
 
 
 @router.get("/auth/google/status")
-async def google_auth_status(user_id: int):
+async def google_auth_status(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     token = await get_google_token(user_id)
     if not token:
         return {"connected": False}
@@ -79,13 +82,15 @@ async def google_auth_status(user_id: int):
 
 
 @router.post("/auth/google/digest-settings")
-async def update_digest_settings(user_id: int, digest_time: str, digest_enabled: bool):
+async def update_digest_settings(digest_time: str, digest_enabled: bool, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     await save_google_digest_settings(user_id, digest_time, digest_enabled)
     return {"status": "saved"}
 
 
 @router.delete("/auth/google/disconnect")
-async def google_disconnect(user_id: int):
+async def google_disconnect(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     await delete_google_token(user_id)
     return {"status": "disconnected"}
 
@@ -93,7 +98,8 @@ async def google_disconnect(user_id: int):
 # ── Digest ────────────────────────────────────────────────────────────────────
 
 @router.post("/auth/google/test-digest")
-async def test_gmail_digest(user_id: int):
+async def test_gmail_digest(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     token = await get_google_token(user_id)
     if not token:
         raise HTTPException(404, "No Gmail connected")
@@ -119,7 +125,8 @@ async def test_gmail_digest(user_id: int):
 # ── Email view ────────────────────────────────────────────────────────────────
 
 @router.get("/email/fetch")
-async def fetch_emails_for_view(user_id: int):
+async def fetch_emails_for_view(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     token = await get_google_token(user_id)
     if not token:
         raise HTTPException(404, "No Gmail connected")

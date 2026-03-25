@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 const NOTE_COLORS = [
   { id: 'gold',    bg: 'rgba(201,168,76,0.15)',  border: 'rgba(201,168,76,0.4)',  text: '#c9a84c' },
@@ -80,7 +81,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
 
   async function loadNotes() {
     try {
-      const { notes } = await (await fetch(`${API}/notes/${userId}`)).json();
+      const { notes } = await (await apiFetch('/notes')).json();
       setNotes(notes || []);
     } catch {}
   }
@@ -132,18 +133,18 @@ export default function NotesView({ API, userId, visible, showToast }) {
     if (!title.trim() && !content.trim()) return;
     setSaving(true);
     try {
-      const body = { user_id: userId, title: title || 'Untitled', content, tag, color };
+      const body = { title: title || 'Untitled', content, tag, color };
       if (isNew) {
-        const res = await fetch(`${API}/notes`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        const res = await apiFetch('/notes', {
+          method: 'POST',
           body: JSON.stringify(body)
         });
         const { note_id } = await res.json();
         setSelected(s => ({ ...s, id: note_id }));
         setIsNew(false);
       } else if (selected?.id) {
-        await fetch(`${API}/notes/${selected.id}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        await apiFetch(`/notes/${selected.id}`, {
+          method: 'PUT',
           body: JSON.stringify(body)
         });
       }
@@ -160,7 +161,7 @@ export default function NotesView({ API, userId, visible, showToast }) {
   async function deleteNote() {
     if (!selected?.id) { setSelected(null); return; }
     try {
-      await fetch(`${API}/notes/${selected.id}?user_id=${userId}`, { method: 'DELETE' });
+      await apiFetch(`/notes/${selected.id}`, { method: 'DELETE' });
       setSelected(null); setMobileEditorOpen(false);
       if (editorRef.current) editorRef.current.innerHTML = '';
       await loadNotes();

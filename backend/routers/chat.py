@@ -1,69 +1,64 @@
 """
-ARIA v4 — Chat router
-Covers: /chat, /chat/file, /memories, /history
+ARIA v4 — Chat router (JWT protected)
 """
 import os
-from fastapi import APIRouter, HTTPException, Request, File, UploadFile, Form
+from fastapi import APIRouter, HTTPException, Request, File, UploadFile, Form, Depends
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from backend.database import (
-    get_conversation_history,
-    get_memories, delete_memory,
-)
+from backend.database import get_conversation_history, get_memories, delete_memory
 from backend.aria import chat
 from backend.file_handler import extract_text_from_file
+from backend.routers.jwt_auth import get_current_user
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-# ── Request models ────────────────────────────────────────────────────────────
-
 class ChatRequest(BaseModel):
     message: str
-    user_id: int
     mode: str = "work"
     lang: str = "en"
     user_local_time: str = None
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-
-@router.get("/history/{user_id}")
-async def get_history(user_id: int, mode: str = "work", limit: int = 30):
+@router.get("/history/me")
+async def get_history(mode: str = "work", limit: int = 30, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     history = await get_conversation_history(user_id, mode=mode, limit=limit)
     return {"messages": history}
 
 
 @router.post("/chat")
 @limiter.limit("30/minute")
-async def chat_endpoint(req: ChatRequest, request: Request):
+async def chat_endpoint(req: ChatRequest, request: Request, current_user: dict = Depends(get_current_user)):
     if not req.message.strip():
         raise HTTPException(400, "Empty message")
+    user_id = int(current_user["sub"])
     try:
-        response = await chat(req.user_id, req.message, req.mode, req.lang, req.user_local_time)
+        response = await chat(user_id, req.message, req.mode, req.lang, req.user_local_time)
         return {"response": response, "mode": req.mode}
     except Exception as e:
         import traceback
-        print(f"[chat] ERROR for user {req.user_id}: {e}")
+        print(f"[chat] ERROR for user {user_id}: {e}")
         print(traceback.format_exc())
         raise HTTPException(500, str(e))
 
 
 @router.post("/chat/file")
 async def chat_with_file(
-    user_id: int = Form(...),
     mode: str = Form("work"),
     lang: str = Form("en"),
     message: str = Form(""),
     file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
+    user_id = int(current_user["sub"])
     try:
         file_bytes = await file.read()
-        mime_type = file.content_type or ""
-        extracted = await extract_text_from_file(file_bytes, file.filename, mime_type)
+        mime_type  = file.content_type or ""
+        extracted  = await extract_text_from_file(file_bytes, file.filename, mime_type)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Could not read file: {e}")
 
@@ -94,12 +89,14 @@ async def chat_with_file(
     return {"response": aria_response, "filename": file.filename, "type": extracted["type"]}
 
 
-@router.get("/memories/{user_id}")
-async def get_memories_endpoint(user_id: int):
+@router.get("/memories/me")
+async def get_memories_endpoint(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     return {"memories": await get_memories(user_id)}
 
 
 @router.delete("/memories/{memory_id}")
-async def delete_memory_endpoint(memory_id: int, user_id: int):
+async def delete_memory_endpoint(memory_id: int, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     await delete_memory(memory_id, user_id)
     return {"status": "deleted"}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 import { fmtDate, formatProfileDate } from '../utils/helpers';
 
 export default function LeftPanel({ API, userId, userName, mode, onModeChange, onMemCountChange, t }) {
@@ -8,7 +9,7 @@ export default function LeftPanel({ API, userId, userName, mode, onModeChange, o
 
   const loadMemories = useCallback(async () => {
     try {
-      const { memories: mems } = await (await fetch(`${API}/memories/${userId}`)).json();
+      const { memories: mems } = await (await apiFetch('/memories/me')).json();
       setMemories(mems || []);
       onMemCountChange && onMemCountChange(mems?.length || 0);
     } catch {}
@@ -21,13 +22,13 @@ export default function LeftPanel({ API, userId, userName, mode, onModeChange, o
   }, [loadMemories]);
 
   async function delMem(id) {
-    await fetch(`${API}/memories/${id}?user_id=${userId}`, { method: 'DELETE' });
+    await apiFetch(`/memories/${id}`, { method: 'DELETE' });
     loadMemories();
   }
 
   async function generateLinkCode() {
     try {
-      const res = await fetch(`${API}/link/generate?user_id=${userId}`, { method: 'POST' });
+      const res = await apiFetch('/link/generate', { method: 'POST' });
       const { code } = await res.json();
       setLinkCode(code); setShowLinkCode(true);
       setTimeout(() => setShowLinkCode(false), 600000);

@@ -1,10 +1,9 @@
 """
-ARIA v4 — Events router
-Covers: CRUD events + Google Calendar sync/push
+ARIA v4 — Events router (JWT protected)
 """
 import asyncio
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from backend.database import (
@@ -15,12 +14,12 @@ from backend.database import (
 from backend.google_calendar import (
     fetch_google_events, create_google_event, update_google_event, delete_google_event,
 )
+from backend.routers.jwt_auth import get_current_user
 
 router = APIRouter()
 
 
 class EventCreate(BaseModel):
-    user_id: int
     title: str
     event_date: str
     event_time: Optional[str] = None
@@ -29,7 +28,6 @@ class EventCreate(BaseModel):
     reminder_minutes: int = 15
 
 class EventUpdate(BaseModel):
-    user_id: int
     title: str
     event_date: str
     event_time: Optional[str] = None
@@ -38,26 +36,27 @@ class EventUpdate(BaseModel):
     reminder_minutes: int = 15
 
 
-@router.get("/events/{user_id}")
-async def get_events_endpoint(user_id: int, date: str = None):
+@router.get("/events")
+async def get_events_endpoint(date: str = None, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     return {"events": await get_events(user_id, date)}
 
 
-@router.get("/events/{user_id}/month")
-async def get_events_month_endpoint(user_id: int, year: int, month: int):
+@router.get("/events/month")
+async def get_events_month_endpoint(year: int, month: int, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     return {"events": await get_events_month(user_id, year, month)}
 
 
 @router.post("/events")
-async def create_event(req: EventCreate):
+async def create_event(req: EventCreate, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     event_id = await add_event(
-        req.user_id, req.title, req.event_date,
-        req.event_time, req.description, req.reminder_minutes,
-        req.end_time
+        user_id, req.title, req.event_date,
+        req.event_time, req.description, req.reminder_minutes, req.end_time
     )
-    # Push to Google Calendar if connected
     try:
-        token = await get_calendar_token(req.user_id)
+        token = await get_calendar_token(user_id)
         if token:
             import json
             token_data = json.loads(token["token_data"]) if isinstance(token["token_data"], str) else token["token_data"]
@@ -73,7 +72,8 @@ async def create_event(req: EventCreate):
 
 
 @router.delete("/events/{event_id}")
-async def delete_event_endpoint(event_id: int, user_id: int):
+async def delete_event_endpoint(event_id: int, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     try:
         events = await get_events(user_id)
         event = next((e for e in events if e["id"] == event_id), None)
@@ -92,14 +92,15 @@ async def delete_event_endpoint(event_id: int, user_id: int):
 
 
 @router.put("/events/{event_id}")
-async def update_event_endpoint(event_id: int, req: EventUpdate):
-    await update_event(event_id, req.user_id, req.title, req.event_date,
+async def update_event_endpoint(event_id: int, req: EventUpdate, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
+    await update_event(event_id, user_id, req.title, req.event_date,
                        req.event_time, req.end_time, req.description, req.reminder_minutes)
     try:
-        events = await get_events(req.user_id)
+        events = await get_events(user_id)
         event = next((e for e in events if e["id"] == event_id), None)
         if event and event.get("google_id"):
-            token = await get_calendar_token(req.user_id)
+            token = await get_calendar_token(user_id)
             if token:
                 import json
                 token_data = json.loads(token["token_data"]) if isinstance(token["token_data"], str) else token["token_data"]
@@ -112,29 +113,19 @@ async def update_event_endpoint(event_id: int, req: EventUpdate):
     return {"status": "updated"}
 
 
-@router.post("/calendar/sync/{user_id}")
-async def sync_google_calendar(user_id: int):
-    """Pull events from Google Calendar into ARIA's DB."""
+@router.post("/calendar/sync")
+async def sync_google_calendar(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     token = await get_calendar_token(user_id)
     if not token:
         return {"synced": 0, "error": "Google Calendar not connected"}
     try:
         import json
-        token_data = (
-            json.loads(token["token_data"])
-            if isinstance(token["token_data"], str)
-            else token["token_data"]
-        )
-        google_events = await asyncio.get_event_loop().run_in_executor(
-            None, fetch_google_events, token_data
-        )
+        token_data = json.loads(token["token_data"]) if isinstance(token["token_data"], str) else token["token_data"]
+        google_events = await asyncio.get_event_loop().run_in_executor(None, fetch_google_events, token_data)
         google_ids = [e["google_id"] for e in google_events]
         for e in google_events:
-            await upsert_google_event(
-                user_id, e["google_id"], e["title"],
-                e["event_date"], e["event_time"],
-                e["end_time"], e["description"]
-            )
+            await upsert_google_event(user_id, e["google_id"], e["title"], e["event_date"], e["event_time"], e["end_time"], e["description"])
         await delete_events_not_in_google(user_id, google_ids)
         return {"synced": len(google_events)}
     except Exception as ex:
@@ -143,26 +134,21 @@ async def sync_google_calendar(user_id: int):
 
 
 @router.post("/calendar/push/{event_id}")
-async def push_event_to_google(event_id: int, user_id: int):
-    """Push a single ARIA event to Google Calendar."""
+async def push_event_to_google(event_id: int, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user["sub"])
     token = await get_google_token(user_id)
     if not token:
         return {"pushed": False, "error": "Google not connected"}
     try:
         import json
-        token_data = (
-            json.loads(token["token_data"])
-            if isinstance(token["token_data"], str)
-            else token["token_data"]
-        )
+        token_data = json.loads(token["token_data"]) if isinstance(token["token_data"], str) else token["token_data"]
         events = await get_events(user_id)
         event = next((e for e in events if e["id"] == event_id), None)
         if not event:
             return {"pushed": False, "error": "Event not found"}
         google_id = await asyncio.get_event_loop().run_in_executor(
             None, create_google_event, token_data,
-            event["title"], event["event_date"],
-            event["event_time"], event["end_time"], event["description"]
+            event["title"], event["event_date"], event["event_time"], event["end_time"], event["description"]
         )
         if google_id:
             await update_event_google_id(event_id, google_id)

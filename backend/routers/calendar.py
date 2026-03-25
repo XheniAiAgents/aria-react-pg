@@ -5,9 +5,10 @@ Routes: /auth/google-calendar/* (OAuth), /calendar/sync, /calendar/push
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 
+from backend.routers.jwt_auth import get_current_user
 from backend.database import (
     get_calendar_token, save_calendar_token, delete_calendar_token,
     get_events,
@@ -30,7 +31,8 @@ def _parse_token(raw) -> dict:
 # ── OAuth ─────────────────────────────────────────────────────────────────────
 
 @router.get("/auth/google-calendar/start")
-async def calendar_auth_start(user_id: int):
+async def calendar_auth_start(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     return {"url": get_calendar_auth_url(user_id)}
 
 
@@ -65,7 +67,8 @@ async def calendar_auth_callback(code: str, state: str):
 
 
 @router.get("/auth/google-calendar/status")
-async def calendar_auth_status(user_id: int):
+async def calendar_auth_status(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     token = await get_calendar_token(user_id)
     if not token:
         return {"connected": False}
@@ -73,7 +76,8 @@ async def calendar_auth_status(user_id: int):
 
 
 @router.delete("/auth/google-calendar/disconnect")
-async def calendar_disconnect(user_id: int):
+async def calendar_disconnect(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     await delete_calendar_token(user_id)
     return {"status": "disconnected"}
 
@@ -81,7 +85,8 @@ async def calendar_disconnect(user_id: int):
 # ── Sync ──────────────────────────────────────────────────────────────────────
 
 @router.post("/calendar/sync/{user_id}")
-async def sync_google_calendar(user_id: int):
+async def sync_google_calendar(current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     """Pull events from Google Calendar into ARIA's DB."""
     token = await get_calendar_token(user_id)
     if not token:
@@ -106,7 +111,8 @@ async def sync_google_calendar(user_id: int):
 
 
 @router.post("/calendar/push/{event_id}")
-async def push_event_to_google(event_id: int, user_id: int):
+async def push_event_to_google(event_id: int, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
     """Push a single ARIA event to Google Calendar."""
     token = await get_calendar_token(user_id)
     if not token:

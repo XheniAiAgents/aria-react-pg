@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 
 export function useGmail(API, userId, showToast) {
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -9,7 +10,7 @@ export function useGmail(API, userId, showToast) {
   const loadEmailAccount = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`${API}/auth/google/status?user_id=${userId}`);
+      const res = await apiFetch('/auth/google/status');
       const data = await res.json();
       setGmailConnected(data.connected);
       if (data.connected) {
@@ -22,7 +23,7 @@ export function useGmail(API, userId, showToast) {
 
   async function connectGmail() {
     try {
-      const res = await fetch(`${API}/auth/google/start?user_id=${userId}`);
+      const res = await apiFetch('/auth/google/start');
       const data = await res.json();
       window.open(data.url, 'gmail_oauth', 'width=500,height=650,left=200,top=100');
       window.addEventListener('message', async (e) => {
@@ -36,8 +37,7 @@ export function useGmail(API, userId, showToast) {
 
   async function saveDigest() {
     try {
-      const res = await fetch(
-        `${API}/auth/google/digest-settings?user_id=${userId}&digest_time=${digestTime}&digest_enabled=${digestEnabled}`,
+      const res = await apiFetch(`/auth/google/digest-settings?digest_time=${digestTime}&digest_enabled=${digestEnabled}`,
         { method: 'POST' }
       );
       if (!res.ok) { showToast('Failed to save.', true); return; }
@@ -48,7 +48,7 @@ export function useGmail(API, userId, showToast) {
   async function testDigest() {
     showToast('Sending test digest…');
     try {
-      const res = await fetch(`${API}/auth/google/test-digest?user_id=${userId}`, { method: 'POST' });
+      const res = await apiFetch('/auth/google/test-digest', { method: 'POST' });
       if (!res.ok) { const e = await res.json(); showToast(e.detail || 'Failed.', true); return; }
       const d = await res.json();
       showToast(`Digest sent! (${d.email_count} emails summarized)`);
@@ -56,7 +56,7 @@ export function useGmail(API, userId, showToast) {
   }
 
   async function disconnectGmail() {
-    await fetch(`${API}/auth/google/disconnect?user_id=${userId}`, { method: 'DELETE' });
+    await apiFetch('/auth/google/disconnect', { method: 'DELETE' });
     await loadEmailAccount();
     showToast('Gmail disconnected.');
   }

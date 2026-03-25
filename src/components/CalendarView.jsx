@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 import EventModal from './EventModal';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -18,7 +19,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
 
   const loadEvents = useCallback(async () => {
     try {
-      const { events } = await (await fetch(`${API}/events/${userId}/month?year=${year}&month=${month + 1}`)).json();
+      const { events } = await (await apiFetch(`/events/month?year=${year}&month=${month + 1}`)).json();
       const map = {};
       (events || []).forEach(e => {
         if (!map[e.event_date]) map[e.event_date] = [];
@@ -32,7 +33,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
     if (!googleConnected) return;
     setSyncing(true);
     try {
-      const res = await fetch(`${API}/calendar/sync/${userId}`, { method: 'POST' });
+      const res = await apiFetch('/calendar/sync', { method: 'POST' });
       const data = await res.json();
       if (!silent) {
         if (data.synced !== undefined) showToast(`Synced ${data.synced} events from Google Calendar`);
@@ -69,7 +70,7 @@ export default function CalendarView({ API, userId, visible, showToast, onEvents
   }
 
   async function deleteEvent(id) {
-    await fetch(`${API}/events/${id}?user_id=${userId}`, { method: 'DELETE' });
+    await apiFetch(`/events/${id}`, { method: 'DELETE' });
     await loadEvents();
     onEventsChanged && onEventsChanged();
   }

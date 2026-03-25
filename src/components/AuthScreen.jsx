@@ -19,8 +19,8 @@ export default function AuthScreen({ API, onLogin, showToast, onForgot, t }) {
         body: JSON.stringify({ email: loginEmail, password: loginPassword })
       });
       if (!res.ok) { const e = await res.json(); setLoginErr(e.detail || 'Invalid credentials.'); return; }
-      const { user } = await res.json();
-      onLogin(user);
+      const { user, token } = await res.json();
+      onLogin(user, token);
     } catch { setLoginErr('Cannot reach ARIA server.'); }
   }
 
@@ -34,8 +34,8 @@ export default function AuthScreen({ API, onLogin, showToast, onForgot, t }) {
         body: JSON.stringify({ name: regName, email: regEmail, password: regPassword })
       });
       if (!res.ok) { const e = await res.json(); setRegErr(e.detail || 'Registration failed.'); return; }
-      const { user } = await res.json();
-      onLogin(user);
+      const { user, token } = await res.json();
+      onLogin(user, token);
     } catch { setRegErr('Cannot reach ARIA server.'); }
   }
 
