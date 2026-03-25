@@ -1,5 +1,44 @@
 import { useState } from 'react';
 
+// Eye icon toggle component
+function PasswordInput({ className, placeholder, value, onChange, onKeyDown }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        className={className}
+        type={show ? 'text' : 'password'}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        style={{ paddingRight: '36px' }}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(s => !s)}
+        style={{
+          position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+          background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+          color: 'var(--ghost)', display: 'flex', alignItems: 'center',
+        }}
+      >
+        {show ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function AuthScreen({ API, onLogin, showToast, onForgot, t }) {
   const [tab, setTab] = useState('login');
   const [loginEmail, setLoginEmail] = useState('');
@@ -61,7 +100,7 @@ export default function AuthScreen({ API, onLogin, showToast, onForgot, t }) {
             onKeyDown={e => e.key === 'Enter' && doEmailLogin()} />
           <div className="auth-label">Password</div>
           <button className="auth-forgot" onClick={onForgot}>{forgotPassword}</button>
-          <input className="auth-input" type="password" placeholder="••••••••"
+          <PasswordInput className="auth-input" placeholder="••••••••"
             value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && doEmailLogin()} />
           <button className="auth-btn" onClick={doEmailLogin}>{signIn}</button>
@@ -79,7 +118,7 @@ export default function AuthScreen({ API, onLogin, showToast, onForgot, t }) {
           <div className="auth-label">
             Password <span style={{ fontSize: '8px', color: 'var(--ghost)', letterSpacing: '0.1em' }}>(min 8 chars)</span>
           </div>
-          <input className="auth-input" type="password" placeholder="••••••••"
+          <PasswordInput className="auth-input" placeholder="••••••••"
             value={regPassword} onChange={e => setRegPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && doRegister()} />
           <button className="auth-btn" onClick={doRegister}>{createAccount}</button>
