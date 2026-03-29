@@ -16,18 +16,12 @@ export function useGoogleCalendar(API, userId, showToast) {
   }, [API, userId]);
 
   async function connectCalendar() {
-    try {
-      const res = await apiFetch('/auth/google-calendar/start');
-      const data = await res.json();
-      window.open(data.url, 'calendar_oauth', 'width=500,height=650,left=200,top=100');
-      window.addEventListener('message', async (e) => {
-        if (e.data?.type === 'calendar_connected') {
-          showToast('Google Calendar connected ✓');
-          await loadCalendarStatus();
-        }
-      }, { once: true });
-    } catch { showToast('Cannot reach ARIA server.', true); }
-  }
+  try {
+    const res = await apiFetch('/auth/google-calendar/start');
+    const data = await res.json();
+    window.location.href = data.url;
+  } catch { showToast('Cannot reach ARIA server.', true); }
+}
 
   async function disconnectCalendar() {
     await apiFetch('/auth/google-calendar/disconnect', { method: 'DELETE' });
