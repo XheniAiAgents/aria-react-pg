@@ -50,9 +50,6 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
   // Load history or show welcome message
   useEffect(() => {
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
     function getWelcome() {
       const h = new Date().getHours();
       const g = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
@@ -102,7 +99,7 @@ export default function ChatView({ API, userId, mode, lang, onMsgCount, visible,
 
     loadHistory();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mode]);
 
   // Email bridge
   useEffect(() => {
