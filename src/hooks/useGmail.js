@@ -25,13 +25,7 @@ export function useGmail(API, userId, showToast) {
     try {
       const res = await apiFetch('/auth/google/start');
       const data = await res.json();
-      window.open(data.url, 'gmail_oauth', 'width=500,height=650,left=200,top=100');
-      window.addEventListener('message', async (e) => {
-        if (e.data?.type === 'gmail_connected') {
-          showToast('Gmail connected ✓');
-          await loadEmailAccount();
-        }
-      }, { once: true });
+      window.location.href = data.url;
     } catch { showToast('Cannot reach ARIA server.', true); }
   }
 
