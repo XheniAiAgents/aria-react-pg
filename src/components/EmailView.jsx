@@ -70,6 +70,14 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
       </div>
       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
         <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>
+        {draft.thread_id && (
+          <button onClick={() => window.open(`https://mail.google.com/mail/#all/${draft.thread_id}`, '_blank')} style={{ ...cancelBtnStyle, color: 'var(--a2,#a599ff)', borderColor: 'rgba(165,153,255,0.3)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Send from Gmail
+            </span>
+          </button>
+        )}
         <button onClick={handleSend} disabled={sending} style={sendBtnStyle}>
           {sending ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -89,37 +97,41 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
 }
 
 // ── Email Picker ──────────────────────────────────────────────────────────────
-function EmailPicker({ emails, onSelect, onCancel, repliedIds }) {
+function EmailPicker({ emails, onSelect, onCancel, repliedIds, hideCancel }) {
   return (
-    <div style={{
-      marginTop: '12px', background: 'var(--card, rgba(255,255,255,0.04))',
-      border: '1px solid rgba(165,153,255,0.2)', borderRadius: '12px',
-      padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px',
-    }}>
-      <div style={{ fontSize: '11px', color: 'var(--a2,#a599ff)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>
-        Which email do you want to reply to?
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       {emails.map((email, i) => (
-        <button key={i} onClick={() => onSelect(email)} style={{
+        <div key={i} style={{
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '8px', padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
-          display: 'flex', flexDirection: 'column', gap: '3px',
-        }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(165,153,255,0.4)'; e.currentTarget.style.background = 'rgba(165,153,255,0.08)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-        >
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg,#e8e6ff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {email.from.split('<')[0].trim()}
+          borderRadius: '8px', padding: '10px 12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg,#e8e6ff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {email.from.split('<')[0].trim()}
+              </span>
               {repliedIds.has(email.thread_id) || repliedIds.has(email.id) ? (
-                <span style={{ fontSize: '10px', background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', borderRadius: '4px', padding: '1px 6px', fontWeight: 600 }}>
+                <span style={{ fontSize: '10px', background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', borderRadius: '4px', padding: '1px 6px', fontWeight: 600, flexShrink: 0 }}>
                   Replied ✓
                 </span>
               ) : null}
             </div>
-          <div style={{ fontSize: '12px', color: 'var(--ghost,#999)' }}>{email.subject}</div>
-        </button>
+            <div style={{ fontSize: '11px', color: 'var(--ghost,#999)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{email.subject}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+            <button onClick={() => onSelect(email)} style={{
+              background: 'rgba(165,153,255,0.12)', border: '1px solid rgba(165,153,255,0.3)',
+              borderRadius: '6px', padding: '5px 10px', color: 'var(--a2,#a599ff)',
+              fontSize: '10px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.04em', whiteSpace: 'nowrap',
+            }}>
+              ↩ Reply
+            </button>
+
+          </div>
+        </div>
       ))}
-      <button onClick={onCancel} style={{ ...cancelBtnStyle, alignSelf: 'flex-end', marginTop: '4px' }}>Cancel</button>
+      {!hideCancel && <button onClick={onCancel} style={{ ...cancelBtnStyle, alignSelf: 'flex-end', marginTop: '4px' }}>Cancel</button>}
     </div>
   );
 }
@@ -165,7 +177,7 @@ function AssistantBubble({ msg, onCompose, isReplyContext }) {
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
               <polyline points="22,6 12,13 2,6"/>
             </svg>
-            Send this email
+            Edit this email
           </button>
         )}
       </div>
@@ -366,25 +378,23 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
             </div>
           )}
 
-          {/* Reply button */}
+          {/* Today's inbox */}
           {!loading && emails.length > 0 && (
-            <button onClick={() => { setShowPicker(p => !p); setComposerDraft(null); }} style={{
-              marginTop: '10px', alignSelf: 'flex-start',
-              display: 'flex', alignItems: 'center', gap: '6px',
-              background: 'rgba(165,153,255,0.1)', border: '1px solid rgba(165,153,255,0.25)',
-              borderRadius: '8px', padding: '6px 14px',
-              color: 'var(--a2,#a599ff)', fontSize: '11px', fontWeight: 600,
-              cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase',
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
-              </svg>
-              {showPicker ? 'Cancel' : 'Reply to an email'}
-            </button>
-          )}
-
-          {showPicker && (
-            <EmailPicker emails={emails} onSelect={handleEmailSelected} onCancel={() => setShowPicker(false)} repliedIds={repliedIds} />
+            <div style={{ marginTop: '14px' }}>
+              <button onClick={() => setShowPicker(p => !p)} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '6px',
+                color: 'var(--a2,#a599ff)', fontSize: '11px', fontWeight: 600,
+                letterSpacing: '0.08em', textTransform: 'uppercase', padding: '0 0 8px 0',
+              }}>
+                <span>{showPicker ? '▲' : '▼'}</span>
+                Today's inbox
+                <span style={{ color: 'var(--ghost,#666)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>({emails.length})</span>
+              </button>
+              {showPicker && (
+                <EmailPicker emails={emails} onSelect={handleEmailSelected} onCancel={() => {}} repliedIds={repliedIds} hideCancel />
+              )}
+            </div>
           )}
 
           {conversation.length > 0 && (
