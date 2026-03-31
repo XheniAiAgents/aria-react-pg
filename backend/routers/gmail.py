@@ -27,6 +27,8 @@ class SendEmailRequest(BaseModel):
     to: str
     subject: str
     body: str
+    thread_id: str = None
+    in_reply_to: str = None
 
 router = APIRouter()
 
@@ -163,7 +165,7 @@ async def send_email(req: SendEmailRequest, current_user: dict = Depends(get_cur
     try:
         token_data = _parse_token(token["token_data"])
         result = await asyncio.get_event_loop().run_in_executor(
-            None, send_email_oauth, token_data, req.to, req.subject, req.body
+            None, send_email_oauth, token_data, req.to, req.subject, req.body, req.thread_id, req.in_reply_to
         )
         return {"status": "sent", "id": result.get("id")}
     except Exception as e:

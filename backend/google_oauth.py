@@ -86,7 +86,7 @@ def fetch_todays_emails_oauth(token_data: dict) -> list[dict]:
     resp = requests.get(
         "https://www.googleapis.com/gmail/v1/users/me/messages",
         headers=headers,
-        params={"q": f"after:{today}", "maxResults": 30}
+        params={"q": f"after:{today} -in:sent", "maxResults": 30}
     )
     resp.raise_for_status()
     messages = resp.json().get("messages", [])
@@ -134,13 +134,17 @@ def fetch_todays_emails_oauth(token_data: dict) -> list[dict]:
         )
         if not r.ok:
             continue
-        raw = base64.urlsafe_b64decode(r.json()["raw"].encode("utf-8"))
+        raw_data = r.json()
+        raw = base64.urlsafe_b64decode(raw_data["raw"].encode("utf-8"))
         parsed = email_lib.message_from_bytes(raw)
         emails.append({
-            "from":    decode_str(parsed.get("From", "")),
-            "subject": decode_str(parsed.get("Subject", "(no subject)")),
-            "date":    decode_str(parsed.get("Date", "")),
-            "body":    get_body(parsed),
+            "id":         msg_ref["id"],
+            "thread_id":  raw_data.get("threadId", ""),
+            "message_id": decode_str(parsed.get("Message-ID", "")),
+            "from":       decode_str(parsed.get("From", "")),
+            "subject":    decode_str(parsed.get("Subject", "(no subject)")),
+            "date":       decode_str(parsed.get("Date", "")),
+            "body":       get_body(parsed),
         })
 
     return emails
@@ -195,7 +199,7 @@ def get_calendar_account_email(token_data: dict) -> str:
     return ""
 
 
-def send_email_oauth(token_data: dict, to: str, subject: str, body: str) -> dict:
+def send_email_oauth(token_data: dict, to: str, subject: str, body: str, thread_id: str = None, in_reply_to: str = None) -> dict:
     """Send an email via Gmail API using OAuth token."""
     import base64
     from email.mime.text import MIMEText
@@ -205,13 +209,20 @@ def send_email_oauth(token_data: dict, to: str, subject: str, body: str) -> dict
     message = MIMEText(body)
     message["to"] = to
     message["subject"] = subject
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+        message["References"] = in_reply_to
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
+    payload = {"raw": raw}
+    if thread_id:
+        payload["threadId"] = thread_id
 
     resp = requests.post(
         "https://www.googleapis.com/gmail/v1/users/me/messages/send",
         headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
-        json={"raw": raw},
+        json=payload,
     )
     resp.raise_for_status()
     return resp.json()

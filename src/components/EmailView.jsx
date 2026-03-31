@@ -3,7 +3,7 @@ import { apiFetch } from '../utils/apiFetch';
 import { fmt } from '../utils/helpers';
 
 // ── Email Composer ────────────────────────────────────────────────────────────
-function EmailComposer({ draft, onSent, onCancel, showToast }) {
+function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
   const [to, setTo] = useState(draft.to || '');
   const [subject, setSubject] = useState(draft.subject || '');
   const [body, setBody] = useState(draft.body || '');
@@ -17,13 +17,20 @@ function EmailComposer({ draft, onSent, onCancel, showToast }) {
       const res = await apiFetch('/email/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: to.trim(), subject: subject.trim(), body }),
+        body: JSON.stringify({
+          to: to.trim(),
+          subject: subject.trim(),
+          body,
+          thread_id: draft.thread_id || null,
+          in_reply_to: draft.in_reply_to || null,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || res.status);
       }
       showToast('✓ Email sent!');
+      if (draft.thread_id) onReplied?.(draft.thread_id);
       onSent();
     } catch (e) {
       showToast(`Error: ${e.message}`, true);
@@ -38,12 +45,15 @@ function EmailComposer({ draft, onSent, onCancel, showToast }) {
       border: '1px solid rgba(165,153,255,0.2)', borderRadius: '12px',
       padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--a2,#a599ff)" strokeWidth="2">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-          <polyline points="22,6 12,13 2,6"/>
-        </svg>
-        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--a2,#a599ff)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>New Email</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--a2,#a599ff)" strokeWidth="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--a2,#a599ff)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>New Email</span>
+        </div>
+        <button onClick={onCancel} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '14px', lineHeight: 1, padding: '4px 7px', borderRadius: '6px' }}>✕</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         <label style={{ fontSize: '10px', color: 'var(--ghost,#666)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>To</label>
@@ -79,7 +89,7 @@ function EmailComposer({ draft, onSent, onCancel, showToast }) {
 }
 
 // ── Email Picker ──────────────────────────────────────────────────────────────
-function EmailPicker({ emails, onSelect, onCancel }) {
+function EmailPicker({ emails, onSelect, onCancel, repliedIds }) {
   return (
     <div style={{
       marginTop: '12px', background: 'var(--card, rgba(255,255,255,0.04))',
@@ -98,7 +108,14 @@ function EmailPicker({ emails, onSelect, onCancel }) {
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(165,153,255,0.4)'; e.currentTarget.style.background = 'rgba(165,153,255,0.08)'; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
         >
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg,#e8e6ff)' }}>{email.from.split('<')[0].trim()}</div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg,#e8e6ff)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {email.from.split('<')[0].trim()}
+              {repliedIds.has(email.thread_id) || repliedIds.has(email.id) ? (
+                <span style={{ fontSize: '10px', background: 'rgba(74,222,128,0.15)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.3)', borderRadius: '4px', padding: '1px 6px', fontWeight: 600 }}>
+                  Replied ✓
+                </span>
+              ) : null}
+            </div>
           <div style={{ fontSize: '12px', color: 'var(--ghost,#999)' }}>{email.subject}</div>
         </button>
       ))}
@@ -133,7 +150,12 @@ function AssistantBubble({ msg, onCompose, isReplyContext }) {
         <div className="a-meta">ARIA <span className="a-time">{msg.time}</span></div>
         <div className="a-bubble" dangerouslySetInnerHTML={{ __html: fmt(msg.text) }} />
         {isReplyContext && (
-          <button onClick={() => onCompose(msg.text || '')} style={{
+          <button onClick={() => {
+            // Strip HTML tags to get plain text for the composer
+            const tmp = document.createElement('div');
+            tmp.innerHTML = fmt(msg.text || '');
+            onCompose(tmp.innerText || msg.text || '');
+          }} style={{
             marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px',
             background: 'rgba(165,153,255,0.12)', border: '1px solid rgba(165,153,255,0.3)',
             borderRadius: '8px', padding: '6px 12px', color: 'var(--a2,#a599ff)',
@@ -165,6 +187,16 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
   const [composerDraft, setComposerDraft] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState(null);
+  const [repliedIds, setRepliedIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('aria_replied_ids') || '[]')); }
+    catch { return new Set(); }
+  });
+
+  // Persist repliedIds on change
+  useEffect(() => {
+    try { localStorage.setItem('aria_replied_ids', JSON.stringify([...repliedIds])); }
+    catch {}
+  }, [repliedIds]);
   const msgsRef = useRef(null);
   const historyLoadedRef = useRef(false);
 
@@ -276,7 +308,13 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
     const fromRaw = selectedEmail?.from || '';
     const toAddr = fromRaw.match(/<(.+)>/)?.[1] || fromRaw;
     const subj = selectedEmail?.subject ? `Re: ${selectedEmail.subject}` : '';
-    setComposerDraft({ to: toAddr, subject: subj, body });
+    setComposerDraft({
+      to: toAddr,
+      subject: subj,
+      body,
+      thread_id: selectedEmail?.thread_id || null,
+      in_reply_to: selectedEmail?.message_id || null,
+    });
     setShowPicker(false);
   }
 
@@ -346,7 +384,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
           )}
 
           {showPicker && (
-            <EmailPicker emails={emails} onSelect={handleEmailSelected} onCancel={() => setShowPicker(false)} />
+            <EmailPicker emails={emails} onSelect={handleEmailSelected} onCancel={() => setShowPicker(false)} repliedIds={repliedIds} />
           )}
 
           {conversation.length > 0 && (
@@ -375,6 +413,12 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
             <EmailComposer
               draft={composerDraft}
               showToast={showToast}
+              onReplied={(threadId) => setRepliedIds(prev => {
+                  const next = new Set(prev);
+                  if (threadId) next.add(threadId);
+                  if (selectedEmail?.id) next.add(selectedEmail.id);
+                  return next;
+                })}
               onSent={() => setComposerDraft(null)}
               onCancel={() => setComposerDraft(null)}
             />
