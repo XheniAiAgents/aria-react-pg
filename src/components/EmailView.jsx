@@ -2,6 +2,156 @@ import { useState, useEffect, useRef } from 'react';
 import { apiFetch } from '../utils/apiFetch';
 import { fmt } from '../utils/helpers';
 
+// ── Email Composer ────────────────────────────────────────────────────────────
+function EmailComposer({ draft, onSent, onCancel, showToast }) {
+  const [to, setTo] = useState(draft.to || '');
+  const [subject, setSubject] = useState(draft.subject || '');
+  const [body, setBody] = useState(draft.body || '');
+  const [sending, setSending] = useState(false);
+
+  async function handleSend() {
+    if (!to.trim()) { showToast('Add a recipient email.', true); return; }
+    if (!subject.trim()) { showToast('Add a subject.', true); return; }
+    setSending(true);
+    try {
+      const res = await apiFetch('/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: to.trim(), subject: subject.trim(), body }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || res.status);
+      }
+      showToast('✓ Email sent!');
+      onSent();
+    } catch (e) {
+      showToast(`Error: ${e.message}`, true);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div style={{
+      marginTop: '12px', background: 'var(--card, rgba(255,255,255,0.04))',
+      border: '1px solid rgba(165,153,255,0.2)', borderRadius: '12px',
+      padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--a2,#a599ff)" strokeWidth="2">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+          <polyline points="22,6 12,13 2,6"/>
+        </svg>
+        <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--a2,#a599ff)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>New Email</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '10px', color: 'var(--ghost,#666)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>To</label>
+        <input value={to} onChange={e => setTo(e.target.value)} placeholder="recipient@email.com" style={inputStyle} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '10px', color: 'var(--ghost,#666)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Subject</label>
+        <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject" style={inputStyle} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '10px', color: 'var(--ghost,#666)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Message</label>
+        <textarea value={body} onChange={e => setBody(e.target.value)} rows={6}
+          style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5' }} />
+      </div>
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '4px' }}>
+        <button onClick={onCancel} style={cancelBtnStyle}>Cancel</button>
+        <button onClick={handleSend} disabled={sending} style={sendBtnStyle}>
+          {sending ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin 0.6s linear infinite' }}/>
+              Sending…
+            </span>
+          ) : (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              Send
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Email Picker ──────────────────────────────────────────────────────────────
+function EmailPicker({ emails, onSelect, onCancel }) {
+  return (
+    <div style={{
+      marginTop: '12px', background: 'var(--card, rgba(255,255,255,0.04))',
+      border: '1px solid rgba(165,153,255,0.2)', borderRadius: '12px',
+      padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px',
+    }}>
+      <div style={{ fontSize: '11px', color: 'var(--a2,#a599ff)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>
+        Which email do you want to reply to?
+      </div>
+      {emails.map((email, i) => (
+        <button key={i} onClick={() => onSelect(email)} style={{
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '8px', padding: '10px 12px', textAlign: 'left', cursor: 'pointer',
+          display: 'flex', flexDirection: 'column', gap: '3px',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(165,153,255,0.4)'; e.currentTarget.style.background = 'rgba(165,153,255,0.08)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--fg,#e8e6ff)' }}>{email.from.split('<')[0].trim()}</div>
+          <div style={{ fontSize: '12px', color: 'var(--ghost,#999)' }}>{email.subject}</div>
+        </button>
+      ))}
+      <button onClick={onCancel} style={{ ...cancelBtnStyle, alignSelf: 'flex-end', marginTop: '4px' }}>Cancel</button>
+    </div>
+  );
+}
+
+const inputStyle = {
+  background: '#ffffff', border: '1px solid rgba(255,255,255,0.15)',
+  borderRadius: '8px', padding: '8px 12px', color: '#000000',
+  fontSize: '13px', outline: 'none', width: '100%', boxSizing: 'border-box',
+};
+const sendBtnStyle = {
+  background: 'var(--a2,#a599ff)', color: '#000', border: 'none', borderRadius: '8px',
+  padding: '8px 18px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+  letterSpacing: '0.04em', display: 'flex', alignItems: 'center',
+};
+const cancelBtnStyle = {
+  background: 'transparent', color: 'var(--ghost,#666)',
+  border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
+  padding: '8px 14px', fontSize: '12px', cursor: 'pointer', letterSpacing: '0.04em',
+};
+
+// ── Assistant bubble ──────────────────────────────────────────────────────────
+function AssistantBubble({ msg, onCompose, isReplyContext }) {
+
+  return (
+    <div className="amsg">
+      <div className="a-orb">A</div>
+      <div style={{ flex: 1 }}>
+        <div className="a-meta">ARIA <span className="a-time">{msg.time}</span></div>
+        <div className="a-bubble" dangerouslySetInnerHTML={{ __html: fmt(msg.text) }} />
+        {isReplyContext && (
+          <button onClick={() => onCompose(msg.text || '')} style={{
+            marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px',
+            background: 'rgba(165,153,255,0.12)', border: '1px solid rgba(165,153,255,0.3)',
+            borderRadius: '8px', padding: '6px 12px', color: 'var(--a2,#a599ff)',
+            fontSize: '11px', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Send this email
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main EmailView ─────────────────────────────────────────────────────────────
 export default function EmailView({ API, userId, lang, visible, showToast, onOpenSettings, t }) {
   const [connected, setConnected] = useState(false);
   const [emails, setEmails] = useState([]);
@@ -11,10 +161,11 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
   const [askInput, setAskInput] = useState('');
   const [conversation, setConversation] = useState([]);
   const [askLoading, setAskLoading] = useState(false);
-  const [emailsExpanded, setEmailsExpanded] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [composerDraft, setComposerDraft] = useState(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState(null);
   const msgsRef = useRef(null);
-
   const historyLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -38,8 +189,7 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
         const { messages: history } = await res.json();
         if (history && history.length > 0) {
           setConversation(prev => prev.length > 0 ? prev : history.map(m => ({
-            role: m.role,
-            text: m.content,
+            role: m.role, text: m.content,
             time: m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''
           })));
         }
@@ -58,13 +208,38 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         setSummary(`Error loading emails: ${err.detail || r.status}`);
-        setLoading(false);
-        return;
+        setLoading(false); return;
       }
       const json = await r.json();
       setEmails(json.emails || []); setSummary(json.summary || ''); setCount(json.count || 0);
       setLoading(false);
     } catch { setLoading(false); }
+  }
+
+  async function handleEmailSelected(email) {
+    setShowPicker(false);
+    setSelectedEmail(email);
+    setAskLoading(true);
+    const prompt = `Draft a reply for this email:\nFrom: ${email.from}\nSubject: ${email.subject}\n\n${email.body}`;
+    setConversation(c => [...c, {
+      role: 'user',
+      text: `↩ Reply to: "${email.subject}"`,
+      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    }]);
+    try {
+      const { response } = await (await apiFetch('/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: prompt, mode: 'email', lang }),
+      })).json();
+      setConversation(c => [...c, {
+        role: 'assistant', text: response, isReply: true,
+        time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } catch {
+      showToast('Cannot reach ARIA.', true);
+    } finally {
+      setAskLoading(false);
+    }
   }
 
   async function askAboutEmails() {
@@ -73,17 +248,36 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
     if (!connected) { showToast('Connect your Gmail first.', true); return; }
     setAskInput('');
     setAskLoading(true);
-    const userMsg = { role: 'user', text: q, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) };
-    setConversation(c => [...c, userMsg]);
+    // If we have a selected email, include it as context for follow-up questions
+    const message = selectedEmail
+      ? `${q}\n\n[Context - email from ${selectedEmail.from}, subject: "${selectedEmail.subject}"]`
+      : q;
+    setConversation(c => [...c, {
+      role: 'user', text: q,
+      time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    }]);
     try {
-      const fullQ = q;
-      const { response } = await (await fetch(`${API}/chat`, {
+      const { response } = await (await apiFetch('/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: fullQ, mode: 'email', lang })
+        body: JSON.stringify({ message, mode: 'email', lang })
       })).json();
-      setConversation(c => [...c, { role: 'assistant', text: response, time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }]);
-    } catch { showToast('Cannot reach ARIA.', true); }
-    finally { setAskLoading(false); }
+      setConversation(c => [...c, {
+        role: 'assistant', text: response, isReply: !!selectedEmail,
+        time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      }]);
+    } catch {
+      showToast('Cannot reach ARIA.', true);
+    } finally {
+      setAskLoading(false);
+    }
+  }
+
+  function openComposer(body) {
+    const fromRaw = selectedEmail?.from || '';
+    const toAddr = fromRaw.match(/<(.+)>/)?.[1] || fromRaw;
+    const subj = selectedEmail?.subject ? `Re: ${selectedEmail.subject}` : '';
+    setComposerDraft({ to: toAddr, subject: subj, body });
+    setShowPicker(false);
   }
 
   return (
@@ -124,10 +318,8 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
                 <span style={{ color: 'var(--a2)' }}>{count} email{count !== 1 ? 's' : ''} today</span>
               </div>
               <div className="email-summary-text" style={{
-                overflow: 'hidden',
-                display: '-webkit-box',
-                WebkitLineClamp: summaryExpanded ? 'unset' : 2,
-                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden', display: '-webkit-box',
+                WebkitLineClamp: summaryExpanded ? 'unset' : 2, WebkitBoxOrient: 'vertical',
               }}>{summary}</div>
               <button onClick={() => setSummaryExpanded(e => !e)}
                 style={{ background: 'none', border: 'none', color: 'var(--a2)', fontSize: '11px', cursor: 'pointer', padding: '4px 0', letterSpacing: '0.05em' }}>
@@ -135,38 +327,34 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
               </button>
             </div>
           )}
-          {!loading && !emails.length && (
-            <div style={{ fontSize: '12px', color: 'var(--ghost)', fontStyle: 'italic', padding: '8px 0' }}>No emails today.</div>
-          )}
+
+          {/* Reply button */}
           {!loading && emails.length > 0 && (
-            <>
-              <button onClick={() => setEmailsExpanded(e => !e)}
-                style={{ background: 'none', border: 'none', color: 'var(--a2)', fontSize: '11px', cursor: 'pointer', padding: '4px 0', textAlign: 'left', letterSpacing: '0.05em' }}>
-                {emailsExpanded ? '▲ Hide emails' : `▼ Show ${emails.length} email${emails.length !== 1 ? 's' : ''}`}
-              </button>
-              {emailsExpanded && emails.map((e, i) => (
-                <div key={i} className="email-item">
-                  <div className="email-item-from">{e.from.split('<')[0].trim()}</div>
-                  <div className="email-item-subject">{e.subject}</div>
-                  <div className="email-item-date">{e.date}</div>
-                </div>
-              ))}
-            </>
+            <button onClick={() => { setShowPicker(p => !p); setComposerDraft(null); }} style={{
+              marginTop: '10px', alignSelf: 'flex-start',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              background: 'rgba(165,153,255,0.1)', border: '1px solid rgba(165,153,255,0.25)',
+              borderRadius: '8px', padding: '6px 14px',
+              color: 'var(--a2,#a599ff)', fontSize: '11px', fontWeight: 600,
+              cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+              </svg>
+              {showPicker ? 'Cancel' : 'Reply to an email'}
+            </button>
           )}
 
-          {/* Email conversation */}
+          {showPicker && (
+            <EmailPicker emails={emails} onSelect={handleEmailSelected} onCancel={() => setShowPicker(false)} />
+          )}
+
           {conversation.length > 0 && (
-            <div ref={msgsRef} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+            <div ref={msgsRef} style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '400px', overflowY: 'auto' }}>
               {conversation.map((m, i) => m.role === 'user' ? (
                 <div key={i} className="umsg"><div className="u-bubble">{m.text}</div></div>
               ) : (
-                <div key={i} className="amsg">
-                  <div className="a-orb">A</div>
-                  <div>
-                    <div className="a-meta">ARIA <span className="a-time">{m.time}</span></div>
-                    <div className="a-bubble" dangerouslySetInnerHTML={{ __html: fmt(m.text) }} />
-                  </div>
-                </div>
+                <AssistantBubble key={i} msg={m} isReplyContext={m.isReply} onCompose={openComposer} />
               ))}
               {askLoading && (
                 <div className="typing">
@@ -181,6 +369,15 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
               <div className="td"/><div className="td"/><div className="td"/>
               <span>ARIA is thinking…</span>
             </div>
+          )}
+
+          {composerDraft && (
+            <EmailComposer
+              draft={composerDraft}
+              showToast={showToast}
+              onSent={() => setComposerDraft(null)}
+              onCancel={() => setComposerDraft(null)}
+            />
           )}
 
           <div className="email-ask-bar">

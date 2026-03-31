@@ -14,7 +14,7 @@ CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 APP_URL       = os.getenv("APP_URL", "http://127.0.0.1:8000")
 REDIRECT_URI  = f"{APP_URL}/auth/google/callback"
-SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar"
+SCOPES = "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/calendar"
 
 
 def get_auth_url(user_id: int) -> str:
@@ -193,3 +193,25 @@ def get_calendar_account_email(token_data: dict) -> str:
     if resp.ok:
         return resp.json().get("email", "")
     return ""
+
+
+def send_email_oauth(token_data: dict, to: str, subject: str, body: str) -> dict:
+    """Send an email via Gmail API using OAuth token."""
+    import base64
+    from email.mime.text import MIMEText
+
+    access_token = get_access_token(token_data)
+
+    message = MIMEText(body)
+    message["to"] = to
+    message["subject"] = subject
+
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+
+    resp = requests.post(
+        "https://www.googleapis.com/gmail/v1/users/me/messages/send",
+        headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+        json={"raw": raw},
+    )
+    resp.raise_for_status()
+    return resp.json()

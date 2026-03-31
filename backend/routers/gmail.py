@@ -18,7 +18,15 @@ from backend.email_service import send_digest_email
 from backend.email_digest import summarize_emails
 from backend.google_oauth import (
     get_auth_url, exchange_code, get_gmail_address, fetch_todays_emails_oauth,
+    send_email_oauth,
 )
+from pydantic import BaseModel
+
+
+class SendEmailRequest(BaseModel):
+    to: str
+    subject: str
+    body: str
 
 router = APIRouter()
 
@@ -140,5 +148,23 @@ async def fetch_emails_for_view(current_user: dict = Depends(get_current_user)):
             None, summarize_emails, emails, user["name"]
         )
         return {"emails": emails, "summary": summary, "count": len(emails)}
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+# ── Send email ────────────────────────────────────────────────────────────────
+
+@router.post("/email/send")
+async def send_email(req: SendEmailRequest, current_user: dict = Depends(get_current_user)):
+    user_id = int(current_user['sub'])
+    token = await get_google_token(user_id)
+    if not token:
+        raise HTTPException(404, "No Gmail connected")
+    try:
+        token_data = _parse_token(token["token_data"])
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, send_email_oauth, token_data, req.to, req.subject, req.body
+        )
+        return {"status": "sent", "id": result.get("id")}
     except Exception as e:
         raise HTTPException(500, str(e))
