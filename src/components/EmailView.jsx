@@ -167,7 +167,7 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
 
   const mobileStyle = {
     position: 'fixed', bottom: '60px', left: '0', right: '0',
-    height: '85vh', zIndex: 1000, borderRadius: '16px 16px 0 0',
+    height: '75vh', zIndex: 1000, borderRadius: '16px 16px 0 0',
   };
 
   const composerStyle = isMobile ? mobileStyle : desktopStyle;
@@ -248,7 +248,7 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
           </div>
         )}
         {/* Footer — always visible */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: `1px solid ${inputBorder}`, flexShrink: 0, paddingBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px 30px', borderTop: `1px solid ${inputBorder}`, flexShrink: 0 }}>
           <button onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setTimeout(() => document.getElementById('aria-global-file-input').click(), 0); }}
             style={{ background: 'none', border: 'none', color: labelColor, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
