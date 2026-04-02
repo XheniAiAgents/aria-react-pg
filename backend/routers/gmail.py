@@ -185,4 +185,6 @@ async def send_email(
         )
         return {"status": "sent", "id": result.get("id")}
     except Exception as e:
-        raise HTTPException(500, str(e))
+    	import traceback
+    	print(f"[email/send] EXCEPTION: {traceback.format_exc()}")
+    	raise HTTPException(500, f"{type(e).__name__}: {str(e)}")
