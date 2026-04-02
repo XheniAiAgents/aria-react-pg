@@ -34,6 +34,32 @@ function ToolBtn({ execCmd, cmd, value, title, labelColor, children }) {
   );
 }
 
+// ── Strip markdown meta text, keep only the actual email draft ──────────────────
+function extractEmailDraft(text) {
+  if (!text) return '';
+  // Remove common ARIA meta lines before/after the draft
+  const lines = text.split('\n');
+  let start = 0;
+  let end = lines.length;
+  // Find where the actual email starts (greeting line)
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (/^(hi |hey |dear |hello |good |subject:|re:)/i.test(l)) {
+      start = i;
+      break;
+    }
+  }
+  // Find where it ends (after sign-off, before meta lines)
+  for (let i = lines.length - 1; i >= start; i--) {
+    const l = lines[i].trim();
+    if (l && !/^(---|\*\*|😊|😄|🎉|copy and paste|just copy|ready to send|hope this|let me know|anything else|feel free)/i.test(l)) {
+      end = i + 1;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n').trim();
+}
+
 // ── Floating Email Composer with Rich Text ────────────────────────────────────
 function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
   const [to, setTo] = useState(draft.to || '');
@@ -482,10 +508,10 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
         time: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
       }]);
       // Auto-open composer with first draft — preserve line breaks
-      const fromRaw = email.from || '';
-      const toAddr = fromRaw.match(/<(.+)>/)?.[1] || fromRaw.trim();
+      const replyToRaw = email.reply_to || email.from || '';
+      const toAddr = replyToRaw.match(/<(.+)>/)?.[1] || replyToRaw.trim();
       // Convert markdown to HTML preserving line breaks
-      const bodyHtml = response.replace(/\n/g, '<br>');
+      const bodyHtml = extractEmailDraft(response).replace(/\n/g, '<br>');
       setComposerDraft({
         to: toAddr,
         subject: email.subject ? `Re: ${email.subject}` : '',
@@ -532,10 +558,10 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
 
       // Update composer whenever in reply mode and not a casual message
       if (selectedEmail && !isCasual) {
-        const fromRaw = selectedEmail.from || '';
-        const toAddr = fromRaw.match(/<(.+)>/)?.[1] || fromRaw.trim();
+        const replyToRaw = selectedEmail.reply_to || selectedEmail.from || '';
+        const toAddr = replyToRaw.match(/<(.+)>/)?.[1] || replyToRaw.trim();
         const subj = selectedEmail.subject ? `Re: ${selectedEmail.subject}` : '';
-        const bodyHtml = response.replace(/\n/g, '<br>');
+        const bodyHtml = extractEmailDraft(response).replace(/\n/g, '<br>');
         setComposerDraft({
           to: toAddr, subject: subj, body: bodyHtml,
           thread_id: selectedEmail.thread_id || null,
@@ -550,9 +576,9 @@ export default function EmailView({ API, userId, lang, visible, showToast, onOpe
   }
 
   function openComposer(body) {
-    const fromRaw = selectedEmail?.from || '';
-    // Extract email address from "Name <email>" format
-    const toAddr = fromRaw.match(/<(.+)>/)?.[1] || fromRaw.trim();
+    // Use Reply-To if available, otherwise From
+    const replyToRaw = selectedEmail?.reply_to || selectedEmail?.from || '';
+    const toAddr = replyToRaw.match(/<(.+)>/)?.[1] || replyToRaw.trim();
     const subj = selectedEmail?.subject ? `Re: ${selectedEmail.subject}` : '';
     setComposerDraft({
       to: toAddr, subject: subj, body,
