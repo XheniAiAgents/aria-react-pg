@@ -159,27 +159,137 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
 
   const isMobile = window.innerWidth < 600;
 
-  const composerStyle = maximized ? {
+  const desktopStyle = maximized ? {
     position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh', zIndex: 1000, borderRadius: '0',
-  } : isMobile ? {
-    position: 'fixed', bottom: '60px', left: '0', right: '0', width: '100vw', zIndex: 1000, borderRadius: '12px 12px 0 0',
   } : {
     position: 'fixed', bottom: '24px', right: '24px', width: '460px', maxWidth: 'calc(100vw - 48px)', zIndex: 1000, borderRadius: '12px',
   };
 
+  const mobileStyle = {
+    position: 'fixed', bottom: '60px', left: '0', right: '0',
+    height: '85vh', zIndex: 1000, borderRadius: '16px 16px 0 0',
+  };
+
+  const composerStyle = isMobile ? mobileStyle : desktopStyle;
+
+  // ── Mobile bottom sheet layout ──
+  if (isMobile) {
+    return (
+      <div style={{
+        ...mobileStyle, background: bg, border: `1px solid ${borderColor}`,
+        boxShadow: '0 -4px 30px rgba(0,0,0,0.4)',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {/* Drag pill */}
+        <div style={{ width: '40px', height: '4px', background: 'rgba(165,153,255,0.4)', borderRadius: '2px', margin: '10px auto 0', flexShrink: 0 }} />
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', flexShrink: 0 }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: textColor }}>{subject || 'New Email'}</span>
+          <button onClick={onCancel} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '20px', padding: '0' }}>✕</button>
+        </div>
+        {/* To / Subject */}
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: '0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: `1px solid ${inputBorder}`, paddingBottom: '10px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '12px', color: labelColor, fontWeight: 600, minWidth: '60px' }}>TO</span>
+            <input value={to} onChange={e => setTo(e.target.value)} placeholder="recipient@email.com"
+              style={{ background: 'none', border: 'none', outline: 'none', color: textColor, fontSize: '14px', width: '100%' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderBottom: `1px solid ${inputBorder}`, paddingBottom: '10px', marginBottom: '6px' }}>
+            <span style={{ fontSize: '12px', color: labelColor, fontWeight: 600, minWidth: '60px' }}>SUBJECT</span>
+            <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject"
+              style={{ background: 'none', border: 'none', outline: 'none', color: textColor, fontSize: '14px', width: '100%' }} />
+          </div>
+        </div>
+        {/* Toolbar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', padding: '4px 10px', background: toolbarBg, borderBottom: `1px solid ${inputBorder}`, flexWrap: 'wrap', flexShrink: 0 }}>
+          <ToolBtn cmd="bold" title="Bold"><b style={{fontSize:'14px'}}>B</b></ToolBtn>
+          <ToolBtn cmd="italic" title="Italic"><i style={{fontSize:'14px'}}>I</i></ToolBtn>
+          <ToolBtn cmd="underline" title="Underline"><u style={{fontSize:'14px'}}>U</u></ToolBtn>
+          <ToolBtn cmd="strikeThrough" title="Strikethrough"><s style={{fontSize:'13px'}}>S</s></ToolBtn>
+          <div style={{ width:'1px', height:'18px', background: inputBorder, margin:'0 4px' }}/>
+          <ToolBtn cmd="insertUnorderedList" title="Bullets">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/>
+              <circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/>
+            </svg>
+          </ToolBtn>
+          <ToolBtn cmd="insertOrderedList" title="Numbers">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/>
+              <path d="M4 6h1v4M4 10h2" strokeLinecap="round"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" strokeLinecap="round"/>
+            </svg>
+          </ToolBtn>
+          <div style={{ width:'1px', height:'18px', background: inputBorder, margin:'0 4px' }}/>
+          <ToolBtn cmd="undo" title="Undo">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.45"/>
+            </svg>
+          </ToolBtn>
+          <ToolBtn cmd="redo" title="Redo">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3.45"/>
+            </svg>
+          </ToolBtn>
+        </div>
+        {/* Editor */}
+        <div ref={editorRef} contentEditable suppressContentEditableWarning
+          onInput={() => setSavedBody(editorRef.current?.innerHTML || '')}
+          style={{ flex: 1, padding: '14px 16px', color: textColor, fontSize: '15px', lineHeight: '1.7', outline: 'none', overflowY: 'auto' }}
+        />
+        {/* Attachments */}
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '0 16px 8px', flexShrink: 0 }}>
+            {attachments.map((f, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(165,153,255,0.1)', border: '1px solid rgba(165,153,255,0.2)', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', color: 'var(--a2,#a599ff)' }}>
+                📎 {f.name}
+                <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '14px', padding: '0', lineHeight: 1 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Footer — always visible */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: `1px solid ${inputBorder}`, flexShrink: 0, paddingBottom: '20px' }}>
+          <button onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setTimeout(() => document.getElementById('aria-global-file-input').click(), 0); }}
+            style={{ background: 'none', border: 'none', color: labelColor, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+            Attach
+          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            {draft.thread_id && (
+              <button onClick={() => window.open(`https://mail.google.com/mail/#all/${draft.thread_id}`, '_blank')}
+                style={{ background: 'transparent', color: 'var(--a2,#a599ff)', border: '1px solid rgba(165,153,255,0.3)', borderRadius: '10px', padding: '10px 18px', fontSize: '14px', cursor: 'pointer' }}>
+                Gmail
+              </button>
+            )}
+            <button onClick={handleSend} disabled={sending}
+              style={{ background: 'var(--a2,#a599ff)', color: '#000', border: 'none', borderRadius: '10px', padding: '10px 24px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {sending ? (
+                <>
+                  <span style={{ width:'12px', height:'12px', borderRadius:'50%', border:'2px solid rgba(0,0,0,0.3)', borderTopColor:'#000', display:'inline-block', animation:'spin 0.6s linear infinite' }}/>
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                  Send
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Desktop floating window layout ──
   return (
     <div style={{
-      ...composerStyle, background: bg, border: `1px solid ${borderColor}`,
+      ...desktopStyle, background: bg, border: `1px solid ${borderColor}`,
       boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
       display: 'flex', flexDirection: 'column', transition: 'all 0.2s ease',
     }}>
-      {/* Mobile drag handle */}
-      {isMobile && !maximized && (
-        <div style={{
-          width: '40px', height: '4px', background: 'rgba(165,153,255,0.4)',
-          borderRadius: '2px', margin: '8px auto 0', flexShrink: 0,
-        }} />
-      )}
       {/* Header */}
       <div onClick={() => !maximized && setMinimized(m => !m)} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
