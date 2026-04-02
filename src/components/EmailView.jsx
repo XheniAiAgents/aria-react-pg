@@ -157,8 +157,12 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
     >{children}</button>
   );
 
+  const isMobile = window.innerWidth < 600;
+
   const composerStyle = maximized ? {
-    position: 'fixed', top: '5vh', left: '5vw', width: '90vw', height: '90vh', zIndex: 1000, borderRadius: '16px',
+    position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh', zIndex: 1000, borderRadius: '0',
+  } : isMobile ? {
+    position: 'fixed', bottom: '60px', left: '0', right: '0', width: '100vw', zIndex: 1000, borderRadius: '12px 12px 0 0',
   } : {
     position: 'fixed', bottom: '24px', right: '24px', width: '460px', maxWidth: 'calc(100vw - 48px)', zIndex: 1000, borderRadius: '12px',
   };
@@ -169,6 +173,13 @@ function EmailComposer({ draft, onSent, onCancel, onReplied, showToast }) {
       boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
       display: 'flex', flexDirection: 'column', transition: 'all 0.2s ease',
     }}>
+      {/* Mobile drag handle */}
+      {isMobile && !maximized && (
+        <div style={{
+          width: '40px', height: '4px', background: 'rgba(165,153,255,0.4)',
+          borderRadius: '2px', margin: '8px auto 0', flexShrink: 0,
+        }} />
+      )}
       {/* Header */}
       <div onClick={() => !maximized && setMinimized(m => !m)} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
