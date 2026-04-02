@@ -199,14 +199,29 @@ def get_calendar_account_email(token_data: dict) -> str:
     return ""
 
 
-def send_email_oauth(token_data: dict, to: str, subject: str, body: str, thread_id: str = None, in_reply_to: str = None) -> dict:
-    """Send an email via Gmail API using OAuth token."""
+def send_email_oauth(token_data: dict, to: str, subject: str, body: str, thread_id: str = None, in_reply_to: str = None, attachments: list = None) -> dict:
+    """Send an email via Gmail API using OAuth token. Supports HTML body and attachments."""
     import base64
     from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email import encoders
 
     access_token = get_access_token(token_data)
 
-    message = MIMEText(body)
+    if attachments:
+        message = MIMEMultipart()
+        message.attach(MIMEText(body, 'html'))
+        for att in attachments:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(att['data'])
+            encoders.encode_base64(part)
+            part.add_header('Content-Disposition', f'attachment; filename="{att["filename"]}"')
+            message.attach(part)
+    else:
+        message = MIMEMultipart()
+        message.attach(MIMEText(body, 'html'))
+
     message["to"] = to
     message["subject"] = subject
     if in_reply_to:
@@ -214,7 +229,6 @@ def send_email_oauth(token_data: dict, to: str, subject: str, body: str, thread_
         message["References"] = in_reply_to
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
-
     payload = {"raw": raw}
     if thread_id:
         payload["threadId"] = thread_id

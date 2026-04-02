@@ -5,7 +5,8 @@ Routes: /auth/google/* (OAuth + digest settings), /email/fetch
 import asyncio
 import json
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from typing import List, Optional
 from fastapi.responses import HTMLResponse
 
 from backend.routers.jwt_auth import get_current_user
@@ -157,15 +158,30 @@ async def fetch_emails_for_view(current_user: dict = Depends(get_current_user)):
 # ── Send email ────────────────────────────────────────────────────────────────
 
 @router.post("/email/send")
-async def send_email(req: SendEmailRequest, current_user: dict = Depends(get_current_user)):
+async def send_email(
+    to: str = Form(...),
+    subject: str = Form(...),
+    body: str = Form(...),
+    thread_id: Optional[str] = Form(None),
+    in_reply_to: Optional[str] = Form(None),
+    files: List[UploadFile] = File(default=[]),
+    current_user: dict = Depends(get_current_user)
+):
     user_id = int(current_user['sub'])
     token = await get_google_token(user_id)
     if not token:
         raise HTTPException(404, "No Gmail connected")
     try:
         token_data = _parse_token(token["token_data"])
+        attachments = []
+        for f in (files or []):
+            if f.filename:
+                data = await f.read()
+                print(f"[email/send] attachment: {f.filename}, size: {len(data)}")
+                attachments.append({"filename": f.filename, "data": data})
+        print(f"[email/send] total attachments: {len(attachments)}")
         result = await asyncio.get_event_loop().run_in_executor(
-            None, send_email_oauth, token_data, req.to, req.subject, req.body, req.thread_id, req.in_reply_to
+            None, send_email_oauth, token_data, to, subject, body, thread_id, in_reply_to, attachments or None
         )
         return {"status": "sent", "id": result.get("id")}
     except Exception as e:
